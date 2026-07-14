@@ -553,7 +553,21 @@ async function 送出投票_() {
     return;
   }
 
+  const submitButton =
+    document.getElementById('submit-vote-button');
+
+  const addOptionButton =
+    document.getElementById('add-option-button');
+
+  if (
+    submitButton &&
+    submitButton.disabled
+  ) {
+    return;
+  }
+
   const voteId = state.currentVote.id;
+
   const inputs = Array.from(
     document.querySelectorAll(
       '#vote-form-area input[name="vote-option"]:checked'
@@ -568,7 +582,17 @@ async function 送出投票_() {
     return input.dataset.snapshot || '';
   });
 
+  const originalText = submitButton
+    ? submitButton.textContent
+    : '送出投票';
+
   try {
+    設定投票操作中_(true);
+
+    顯示訊息_(
+      '正在送出投票，請稍候……'
+    );
+
     const data = await apiRequest_(
       'submitVote',
       {
@@ -578,24 +602,81 @@ async function 送出投票_() {
       }
     );
 
-    frontLog_('vote.submit.completed', {
-      voteId: voteId,
-      operation: data.operation || ''
-    });
+    if (!data || !data.vote) {
+      throw new Error(
+        '後端未回傳更新後的投票資料'
+      );
+    }
 
-    await 重新載入目前投票_(voteId);
+    state.currentVote = data.vote;
+
+    renderVoteDetail_(
+      state.currentVote
+    );
 
     顯示訊息_(
       data.message || '投票已成功送出'
     );
+
+    frontLog_('vote.submit.completed', {
+      voteId: voteId,
+      operation: data.operation || ''
+    });
   } catch (error) {
     frontLog_('vote.submit.failed', {
       voteId: voteId,
       message: error.message
     });
 
-    顯示訊息_(error.message, true);
+    顯示訊息_(
+      error.message || '投票失敗',
+      true
+    );
+  } finally {
+    設定投票操作中_(false);
+
+    if (submitButton) {
+      submitButton.textContent = originalText;
+    }
+
+    if (addOptionButton) {
+      addOptionButton.disabled =
+        state.currentVote
+          ? Boolean(
+            state.currentVote.canAddOption === false
+          )
+          : false;
+    }
   }
+}
+
+function 設定投票操作中_(isBusy) {
+  const submitButton =
+    document.getElementById('submit-vote-button');
+
+  const addOptionButton =
+    document.getElementById('add-option-button');
+
+  if (submitButton) {
+    submitButton.disabled = isBusy;
+
+    if (isBusy) {
+      submitButton.textContent =
+        '處理中，請稍候……';
+    }
+  }
+
+  if (addOptionButton) {
+    addOptionButton.disabled = isBusy;
+  }
+
+  document
+    .querySelectorAll(
+      '#vote-form-area input[name="vote-option"]'
+    )
+    .forEach(function (input) {
+      input.disabled = isBusy;
+    });
 }
 
 async function 重新載入目前投票_(voteId) {
