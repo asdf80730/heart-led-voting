@@ -1,10 +1,12 @@
+
 'use strict';
 
 const state = {
   idToken: '',
   session: null,
   votes: [],
-  currentVote: null
+  currentVote: null,
+  operationBusy: false
 };
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -24,6 +26,11 @@ function 綁定事件_() {
   綁定元素事件_('refresh-button', 'click', 載入投票列表_);
 
   綁定元素事件_('back-list-button', 'click', function () {
+    state.currentVote = null;
+    state.operationBusy = false;
+
+    移除新增選項區塊_();
+    顯示訊息_('');
     顯示畫面_('vote-list-view');
   });
 
@@ -83,6 +90,9 @@ async function 初始化LIFF_() {
     state.votes = Array.isArray(session.votes)
       ? session.votes
       : [];
+
+    state.currentVote = null;
+    state.operationBusy = false;
 
     更新系統及使用者資訊_(session);
 
@@ -272,6 +282,10 @@ function frontLog_(event, data) {
 
 async function 載入投票列表_() {
   try {
+    state.currentVote = null;
+    state.operationBusy = false;
+
+    移除新增選項區塊_();
     顯示畫面_('loading-view');
 
     const data = await apiRequest_('getVotes', {});
@@ -343,6 +357,9 @@ function renderVoteList_(votes) {
 
 async function 載入單筆投票_(voteId) {
   try {
+    state.operationBusy = false;
+    移除新增選項區塊_();
+
     顯示畫面_('loading-view');
 
     frontLog_('vote.load.start', {
@@ -530,7 +547,6 @@ function renderVoteDetail_(vote, preservedIndexes) {
     document.getElementById('add-option-button');
 
   if (submitButton) {
-    submitButton.disabled = !canVote;
     submitButton.textContent =
       myRecord.hasVoted
         ? '修改投票'
@@ -541,6 +557,7 @@ function renderVoteDetail_(vote, preservedIndexes) {
     addOptionButton.disabled = !canVote;
   }
 
+  同步投票操作狀態_();
   顯示訊息_('');
 }
 
@@ -634,23 +651,61 @@ async function 送出投票_() {
 }
 
 function 設定投票操作中_(isBusy) {
+  state.operationBusy = Boolean(isBusy);
+  同步投票操作狀態_();
+}
+
+function 同步投票操作狀態_() {
+  const vote = state.currentVote;
+  const isBusy = state.operationBusy;
+
   const submitButton =
     document.getElementById('submit-vote-button');
 
   const addOptionButton =
     document.getElementById('add-option-button');
 
+  const printButton =
+    document.getElementById('print-button');
+
+  const canVote = Boolean(
+    vote &&
+    vote.closed !== true &&
+    vote.canVote !== false &&
+    vote.blacklisted !== true
+  );
+
+  const canAddOption = Boolean(
+    vote &&
+    vote.closed !== true &&
+    vote.canAddOption !== false &&
+    vote.blacklisted !== true
+  );
+
   if (submitButton) {
-    submitButton.disabled = isBusy;
+    submitButton.disabled =
+      isBusy || !canVote;
 
     if (isBusy) {
       submitButton.textContent =
         '處理中，請稍候……';
+    } else if (vote) {
+      submitButton.textContent =
+        vote.myRecord &&
+        vote.myRecord.hasVoted
+          ? '修改投票'
+          : '送出投票';
     }
   }
 
   if (addOptionButton) {
-    addOptionButton.disabled = isBusy;
+    addOptionButton.disabled =
+      isBusy || !canAddOption;
+  }
+
+  if (printButton) {
+    printButton.disabled =
+      isBusy || !vote;
   }
 
   document
@@ -658,8 +713,17 @@ function 設定投票操作中_(isBusy) {
       '#vote-form-area input[name="vote-option"]'
     )
     .forEach(function (input) {
-      input.disabled = isBusy;
+      input.disabled =
+        isBusy || !canVote;
     });
+
+  const saveButton =
+    document.getElementById('save-option-button');
+
+  if (saveButton) {
+    saveButton.disabled =
+      isBusy || !canAddOption;
+  }
 }
 
 async function 重新載入目前投票_(voteId) {
@@ -683,6 +747,26 @@ async function 重新載入目前投票_(voteId) {
  * ========================================================= */
 
 function 顯示新增選項_() {
+  if (!state.currentVote) {
+    return;
+  }
+
+  const vote = state.currentVote;
+
+  const canAddOption =
+    state.operationBusy !== true &&
+    vote.closed !== true &&
+    vote.canAddOption !== false &&
+    vote.blacklisted !== true;
+
+  if (!canAddOption) {
+    顯示訊息_(
+      '目前無法新增選項',
+      true
+    );
+    return;
+  }
+
   if (
     document.getElementById('new-option-box')
   ) {
@@ -718,6 +802,7 @@ function 顯示新增選項_() {
   if (formArea) {
     formArea.appendChild(box);
     input.focus();
+    同步投票操作狀態_();
   }
 }
 
@@ -798,7 +883,7 @@ async function 新增選項_() {
       preservedIndexes
     );
 
-    input.value = '';
+    移除新增選項區塊_();
 
     顯示訊息_('新增選項成功');
 
@@ -819,8 +904,14 @@ async function 新增選項_() {
   } finally {
     設定投票操作中_(false);
 
-    saveButton.disabled = false;
-    saveButton.textContent = '新增選項';
+    const currentSaveButton =
+      document.getElementById('save-option-button');
+
+    if (currentSaveButton) {
+      currentSaveButton.textContent = '新增選項';
+    }
+
+    同步投票操作狀態_();
   }
 }
 
@@ -834,12 +925,25 @@ function 取得目前勾選行號_() {
   });
 }
 
+function 移除新增選項區塊_() {
+  const box =
+    document.getElementById('new-option-box');
+
+  if (box) {
+    box.remove();
+  }
+}
+
 /* =========================================================
  * 列印
  * ========================================================= */
 
 async function 列印投票_() {
   if (!state.currentVote) {
+    return;
+  }
+
+  if (state.operationBusy) {
     return;
   }
 
@@ -866,6 +970,8 @@ async function 列印投票_() {
     `);
 
     printWindow.document.close();
+
+    設定投票操作中_(true);
 
     const data = await apiRequest_(
       'getPrintData',
@@ -899,6 +1005,8 @@ async function 列印投票_() {
     });
 
     顯示訊息_(error.message, true);
+  } finally {
+    設定投票操作中_(false);
   }
 }
 
