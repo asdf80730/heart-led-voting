@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1"
+  >
+
+  <title>線上投票系統</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="config.js"></script>
+  <script defer src="app.js"></script>
+</head>
+
+<body>
+  <main class="container">
+    <header class="app-header">
+      <h1 id="system-name">線上投票系統</h1>
+      <div id="user-info"></div>
+    </header>
+
+    <section id="loading-view" class="view">
+      <div class="loading">正在登入，請稍候……</div>
+    </section>
+
+    <section id="error-view" class="view hidden">
+      <div class="message error">
+        <h2>發生錯誤</h2>
+        <p id="error-message"></p>
+        <button id="retry-button" class="button">重新整理</button>
+      </div>
+    </section>
+
+    <section id="unauthorized-view" class="view hidden">
+      <div class="message warning">
+        <h2>尚未授權</h2>
+        <p>你的 LINE 帳號已建立，但目前尚未啟用。</p>
+        <p id="unauthorized-user-id"></p>
+        <p>請聯絡管理者開通使用權限。</p>
+      </div>
+    </section>
+
+    <section id="disabled-view" class="view hidden">
+      <div class="message warning">
+        <h2>帳號已停用</h2>
+        <p>目前無法使用投票系統。</p>
+        <p id="disabled-user-id"></p>
+        <p>請聯絡管理者。</p>
+      </div>
+    </section>
+
+    <section id="vote-list-view" class="view hidden">
+      <div class="section-title">
+        <h2>目前投票</h2>
+        <button id="refresh-button" class="button secondary">
+          重新整理
+        </button>
+      </div>
+
+      <div id="vote-list"></div>
+    </section>
+
+    <section id="vote-detail-view" class="view hidden">
+      <button id="back-list-button" class="button secondary">
+        ← 返回投票列表
+      </button>
+
+      <article id="vote-detail" class="card"></article>
+
+      <div id="vote-form-area"></div>
+
+      <div class="action-row">
+        <button id="submit-vote-button" class="button primary">
+          送出投票
+        </button>
+
+        <button id="add-option-button" class="button secondary">
+          新增選項
+        </button>
+
+        <button id="result-button" class="button secondary">
+          查看結果
+        </button>
+
+        <button id="details-button" class="button secondary">
+          查看明細
+        </button>
+
+        <button id="print-button" class="button secondary">
+          列印
+        </button>
+      </div>
+
+      <p id="vote-message" class="form-message"></p>
+    </section>
+
+    <section id="result-view" class="view hidden">
+      <button id="back-vote-button" class="button secondary">
+        ← 返回投票
+      </button>
+
+      <article id="result-content" class="card"></article>
+    </section>
+
+    <section id="details-view" class="view hidden">
+      <button id="back-vote-from-details-button" class="button secondary">
+        ← 返回投票
+      </button>
+
+      <article id="details-content" class="card"></article>
+    </section>
+  </main>
+</body>
+</html>
