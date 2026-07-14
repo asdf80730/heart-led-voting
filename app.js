@@ -1,16 +1,13 @@
 'use strict';
 
-/*
- * 本檔案採用省 Token 的精簡排版方式：
- * 只壓縮排版，不刪除主要功能；
- * 保留基本可讀性與重要註解；
- * 列印版 CSS 由 style.css 統一管理。
- */
-
 const state={
   idToken:'',
   session:null,
   votes:[],
+  activeVotes:[],
+  closedVotes:[],
+  listMode:'active',
+  searchText:'',
   currentVote:null,
   operationBusy:false
 };
@@ -27,47 +24,38 @@ document.addEventListener('DOMContentLoaded',()=>{
 function 綁定事件_(){
   綁定元素事件_('retry-button','click',重新登入_);
   綁定元素事件_('refresh-button','click',載入投票列表_);
+  綁定元素事件_('submit-vote-button','click',送出投票_);
+  綁定元素事件_('add-option-button','click',顯示新增選項_);
+  綁定元素事件_('print-button','click',列印投票_);
+
+  綁定元素事件_('active-votes-tab','click',()=>{
+    state.listMode='active';
+    更新投票分頁_();
+  });
+
+  綁定元素事件_('closed-votes-tab','click',()=>{
+    state.listMode='closed';
+    更新投票分頁_();
+  });
+
+  綁定元素事件_('vote-search-input','input',event=>{
+    state.searchText=event.target.value.trim();
+    更新投票分頁_();
+  });
 
   綁定元素事件_('back-list-button','click',()=>{
     state.currentVote=null;
     state.operationBusy=false;
     移除新增選項區塊_();
     顯示訊息_('');
+    更新投票分頁_();
     顯示畫面_('vote-list-view');
   });
-
-  綁定元素事件_('submit-vote-button','click',送出投票_);
-  綁定元素事件_('add-option-button','click',顯示新增選項_);
-  綁定元素事件_('print-button','click',列印投票_);
 }
 
 function 綁定元素事件_(id,eventName,handler){
   const element=document.getElementById(id);
   if(element)element.addEventListener(eventName,handler);
-}
-
-/**
- * 錯誤頁面的「重新整理」按鈕：
- * 清除目前登入狀態，登出 LIFF，再重新登入。
- */
-function 重新登入_(){
-  state.idToken='';
-  state.session=null;
-  state.currentVote=null;
-  state.operationBusy=false;
-
-  try{
-    if(!window.liff){
-      window.location.reload();
-      return;
-    }
-
-    if(liff.isLoggedIn())liff.logout();
-    liff.login({redirectUri:window.location.href});
-  }catch(error){
-    frontLog_('liff.relogin.failed',{message:error.message});
-    window.location.reload();
-  }
 }
 
 /* =========================================================
@@ -99,29 +87,26 @@ async function 初始化LIFF_(){
     if(!state.idToken)
       throw new Error('無法取得 LINE ID Token');
 
-    frontLog_('bootstrap.start',{});
-
     const session=await apiRequest_('bootstrap',{});
 
     state.session=session;
-    state.votes=Array.isArray(session.votes)?session.votes:[];
-    state.currentVote=null;
-    state.operationBusy=false;
-
+    設定投票資料_(session&&session.votes);
     更新系統及使用者資訊_(session);
 
-    const user=session.user||{};
+    const user=session&&session.user||{};
 
     if(!user.authorized){
       顯示未授權畫面_(user);
       return;
     }
 
-    renderVoteList_(state.votes);
+    更新投票分頁_();
     顯示畫面_('vote-list-view');
 
     frontLog_('bootstrap.completed',{
-      voteCount:state.votes.length
+      voteCount:state.votes.length,
+      activeCount:state.activeVotes.length,
+      closedCount:state.closedVotes.length
     });
   }catch(error){
     frontLog_('bootstrap.failed',{message:error.message});
@@ -129,58 +114,73 @@ async function 初始化LIFF_(){
   }
 }
 
+function 重新登入_(){
+  state.idToken='';
+  state.session=null;
+  state.currentVote=null;
+  state.operationBusy=false;
+
+  try{
+    if(!window.liff){
+      window.location.reload();
+      return;
+    }
+
+    if(liff.isLoggedIn())liff.logout();
+    liff.login({redirectUri:window.location.href});
+  }catch(error){
+    frontLog_('liff.relogin.failed',{message:error.message});
+    window.location.reload();
+  }
+}
+
 function 更新系統及使用者資訊_(data){
-  const systemNameElement=document.getElementById('system-name');
-  const userInfoElement=document.getElementById('user-info');
+  const systemName=document.getElementById('system-name');
+  const userInfo=document.getElementById('user-info');
+  const oldUser=state.session&&state.session.user;
+  const user=data&&data.user||oldUser||{};
 
-  /*
-   * getVotes 可能沒有回傳 user。
-   * 因此優先使用本次資料，沒有時沿用 bootstrap 的使用者資料。
-   */
-  const sessionUser=state.session&&state.session.user;
-  const user=data&&data.user||sessionUser||{};
-
-  if(systemNameElement)
-    systemNameElement.textContent=
+  if(systemName)
+    systemName.textContent=
       data&&data.systemName||
       state.session&&state.session.systemName||
       '線上投票系統';
 
-  if(userInfoElement)
-    userInfoElement.textContent=
+  if(userInfo)
+    userInfo.textContent=
       '使用者：'+(user.displayName||user.userId||'')+
       '｜狀態：'+(user.status||'');
 }
 
 function 顯示未授權畫面_(user){
-  const unauthorizedElement=
-    document.getElementById('unauthorized-user-id');
+  const id=user&&user.userId||'';
+  const unauthorized=document.getElementById(
+    'unauthorized-user-id'
+  );
+  const disabled=document.getElementById(
+    'disabled-user-id'
+  );
 
-  const disabledElement=
-    document.getElementById('disabled-user-id');
+  if(unauthorized)
+    unauthorized.textContent='LINE User ID：'+id;
 
-  const userId=user.userId||'';
-
-  if(unauthorizedElement)
-    unauthorizedElement.textContent='LINE User ID：'+userId;
-
-  if(disabledElement)
-    disabledElement.textContent='LINE User ID：'+userId;
+  if(disabled)
+    disabled.textContent='LINE User ID：'+id;
 
   顯示畫面_(
-    user.status==='停用'
+    user&&user.status==='停用'
       ?'disabled-view'
       :'unauthorized-view'
   );
 }
 
 /* =========================================================
- * API 與 Log
+ * API
  * ========================================================= */
 
 async function apiRequest_(action,payload){
   const requestId=建立RequestId_();
-  const startTime=performance.now();
+  const start=performance.now();
 
   const body={
     action,
@@ -200,17 +200,13 @@ async function apiRequest_(action,payload){
     });
 
     const result=await response.json();
-    const durationMs=Math.round(performance.now()-startTime);
 
     frontLog_('api.request.completed',{
       requestId,
       action,
       httpStatus:response.status,
       ok:result.ok,
-      durationMs,
-      serverMs:result.meta
-        ?result.meta.durationMs||null
-        :null
+      durationMs:Math.round(performance.now()-start)
     });
 
     if(!response.ok)
@@ -218,9 +214,8 @@ async function apiRequest_(action,payload){
 
     if(!result.ok)
       throw new Error(
-        result.error&&result.error.message
-          ?result.error.message
-          :'API 操作失敗'
+        result.error&&result.error.message||
+        'API 操作失敗'
       );
 
     return result.data;
@@ -228,7 +223,7 @@ async function apiRequest_(action,payload){
     frontLog_('api.request.failed',{
       requestId,
       action,
-      durationMs:Math.round(performance.now()-startTime),
+      durationMs:Math.round(performance.now()-start),
       message:error.message
     });
     throw error;
@@ -246,22 +241,120 @@ function 建立RequestId_(){
 }
 
 function frontLog_(event,data){
-  const record={
-    source:'frontend',
-    event,
-    time:new Date().toISOString(),
-    data:data||{}
-  };
-
   console.info(
     '[投票系統]',
     event,
-    JSON.stringify(record.data)
+    JSON.stringify(data||{})
   );
 }
 
 /* =========================================================
- * 投票列表
+ * 投票分類、截止判斷與搜尋
+ * ========================================================= */
+
+function 設定投票資料_(votes){
+  state.votes=Array.isArray(votes)?votes:[];
+
+  state.activeVotes=state.votes.filter(
+    vote=>!是否已截止_(vote)
+  );
+
+  state.closedVotes=state.votes.filter(
+    vote=>是否已截止_(vote)
+  );
+}
+
+function 是否已截止_(vote){
+  if(!vote)return true;
+
+  if(
+    vote.closed===true||
+    vote.closed==='true'||
+    vote.status==='已截止'||
+    vote.status==='截止'
+  )
+    return true;
+
+  const value=String(vote.deadline||'').trim();
+
+  if(!value)return false;
+
+  /*
+   * YYYY-MM-DD 與 YYYY/MM/DD 視為當地日期的
+   * 23:59:59 前有效，避免 UTC 轉換造成提前截止。
+   */
+  const date=value.match(
+    /^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})$/
+  );
+
+  if(date){
+    const end=new Date(
+      Number(date[1]),
+      Number(date[2])-1,
+      Number(date[3]),
+      23,59,59,999
+    );
+
+    return Date.now()>end.getTime();
+  }
+
+  const timestamp=Date.parse(value);
+
+  return !Number.isNaN(timestamp)&&
+    Date.now()>timestamp;
+}
+
+function 搜尋投票_(votes){
+  const keyword=state.searchText.toLowerCase();
+
+  if(!keyword)return votes;
+
+  return votes.filter(vote=>{
+    const text=[
+      vote.id,
+      vote.markdown,
+      vote.title,
+      vote.subject,
+      vote.name,
+      清除Markdown格式_(vote.markdownHtml||'')
+    ].join(' ').toLowerCase();
+
+    return text.includes(keyword);
+  });
+}
+
+function 更新投票分頁_(){
+  const source=state.listMode==='closed'
+    ?state.closedVotes
+    :state.activeVotes;
+
+  renderVoteList_(搜尋投票_(source));
+  更新分頁樣式_();
+}
+
+function 更新分頁樣式_(){
+  const active=document.getElementById(
+    'active-votes-tab'
+  );
+  const closed=document.getElementById(
+    'closed-votes-tab'
+  );
+
+  if(active)
+    active.classList.toggle(
+      'active',
+      state.listMode==='active'
+    );
+
+  if(closed)
+    closed.classList.toggle(
+      'active',
+      state.listMode==='closed'
+    );
+}
+
+/* =========================================================
+ * 首頁投票列表
  * ========================================================= */
 
 async function 載入投票列表_(){
@@ -273,28 +366,27 @@ async function 載入投票列表_(){
 
     const data=await apiRequest_('getVotes',{});
 
-    state.votes=Array.isArray(data.votes)
-      ?data.votes
-      :[];
+    設定投票資料_(data&&data.votes);
 
-    /*
-     * getVotes 可能只回傳 votes。
-     * 合併資料時保留 bootstrap 的 user 與 systemName。
-     */
     state.session=Object.assign(
       {},
       state.session||{},
-      data,
+      data||{},
       {
-        user:data.user||
+        user:data&&data.user||
           state.session&&state.session.user||
           {}
       }
     );
 
     更新系統及使用者資訊_(state.session);
-    renderVoteList_(state.votes);
+    更新投票分頁_();
     顯示畫面_('vote-list-view');
+
+    frontLog_('vote.list.loaded',{
+      activeCount:state.activeVotes.length,
+      closedCount:state.closedVotes.length
+    });
   }catch(error){
     顯示錯誤_(error.message);
   }
@@ -308,26 +400,28 @@ function renderVoteList_(votes){
 
   if(!votes.length){
     container.innerHTML=
-      '<div class="message">目前沒有啟用中的投票。</div>';
+      '<div class="message">'+
+      (state.listMode==='closed'
+        ?'目前沒有已截止的投票。'
+        :'目前沒有進行中的投票。')+
+      '</div>';
     return;
   }
 
   votes.forEach(vote=>{
     const item=document.createElement('article');
-    item.className='vote-item';
-
     const title=document.createElement('h3');
-    title.innerHTML=
-      vote.markdownHtml||
-      escapeHtml_(vote.id);
-
     const meta=document.createElement('p');
+    const button=document.createElement('button');
+
+    item.className='vote-item';
+    title.textContent=取得首頁題目_(vote);
+
     meta.textContent=
       (vote.id||'')+'｜'+
       (vote.multiSelect?'複選':'單選')+
       '｜截止日期：'+(vote.deadline||'無');
 
-    const button=document.createElement('button');
     button.className='button';
     button.type='button';
     button.textContent='查看投票';
@@ -341,6 +435,48 @@ function renderVoteList_(votes){
   });
 }
 
+function 取得首頁題目_(vote){
+  const source=
+    vote.markdown||
+    vote.title||
+    vote.subject||
+    vote.name||
+    vote.markdownHtml||
+    vote.id||
+    '';
+
+  const firstLine=String(source)
+    .replace(/\r\n/g,'\n')
+    .replace(/\r/g,'\n')
+    .split('\n')
+    .map(line=>line.trim())
+    .find(Boolean)||'';
+
+  return 清除Markdown格式_(firstLine);
+}
+
+function 清除Markdown格式_(value){
+  const element=document.createElement('div');
+
+  element.innerHTML=String(value==null?'':value);
+
+  return(element.textContent||element.innerText||'')
+    .replace(/^\s{0,3}#{1,6}\s+/,'')
+    .replace(/^\s{0,3}>\s?/,'')
+    .replace(/^\s*[-*+]\s+/,'')
+    .replace(/^\s*\d+[.)]\s+/,'')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g,'$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')
+    .replace(/`([^`]+)`/g,'$1')
+    .replace(/\*\*([^*]+)\*\*/g,'$1')
+    .replace(/__([^_]+)__/g,'$1')
+    .replace(/~~([^~]+)~~/g,'$1')
+    .replace(/\*([^*]+)\*/g,'$1')
+    .replace(/_([^_]+)_/g,'$1')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
 /* =========================================================
  * 單筆投票
  * ========================================================= */
@@ -351,8 +487,6 @@ async function 載入單筆投票_(voteId){
     移除新增選項區塊_();
     顯示畫面_('loading-view');
 
-    frontLog_('vote.load.start',{voteId});
-
     const data=await apiRequest_('getVote',{voteId});
 
     if(!data||!data.vote)
@@ -361,13 +495,6 @@ async function 載入單筆投票_(voteId){
     state.currentVote=data.vote;
     renderVoteDetail_(state.currentVote);
     顯示畫面_('vote-detail-view');
-
-    frontLog_('vote.load.completed',{
-      voteId,
-      optionCount:Array.isArray(data.vote.options)
-        ?data.vote.options.length
-        :0
-    });
   }catch(error){
     顯示錯誤_(error.message);
   }
@@ -379,10 +506,9 @@ function renderVoteDetail_(vote,preservedIndexes){
 
   if(!detail||!formArea)return;
 
-  const myRecord=vote.myRecord||{
+  const record=vote.myRecord||{
     hasVoted:false,
     selectedIndexes:[],
-    snapshots:[],
     createdAt:'',
     updatedAt:''
   };
@@ -390,30 +516,35 @@ function renderVoteDetail_(vote,preservedIndexes){
   const selectedIndexes=
     Array.isArray(preservedIndexes)
       ?preservedIndexes
-      :Array.isArray(myRecord.selectedIndexes)
-        ?myRecord.selectedIndexes
+      :Array.isArray(record.selectedIndexes)
+        ?record.selectedIndexes
         :[];
-
-  const counts=Array.isArray(vote.counts)
-    ?vote.counts
-    :[];
 
   const options=Array.isArray(vote.options)
     ?vote.options
     :[];
 
+  const counts=Array.isArray(vote.counts)
+    ?vote.counts
+    :[];
+
+  const closed=是否已截止_(vote);
   const canVote=
-    vote.closed!==true&&
+    !closed&&
     vote.canVote!==false&&
     vote.blacklisted!==true;
 
-  const voteStatusHtml=myRecord.hasVoted
+  const status=closed
+    ?'<span class="badge closed">已截止</span>'
+    :'<span class="badge">投票進行中</span>';
+
+  const recordHtml=record.hasVoted
     ?`
       <div class="my-vote-status voted">
         ✅ 你已經投過票<br>
         <small>
-          首次投票：${escapeHtml_(myRecord.createdAt)}<br>
-          最後修改：${escapeHtml_(myRecord.updatedAt)}
+          首次投票：${escapeHtml_(record.createdAt)}<br>
+          最後修改：${escapeHtml_(record.updatedAt)}
         </small>
       </div>
     `
@@ -423,11 +554,7 @@ function renderVoteDetail_(vote,preservedIndexes){
       </div>
     `;
 
-  const statusHtml=vote.closed
-    ?'<span class="badge closed">已截止</span>'
-    :'<span class="badge">投票進行中</span>';
-
-  const permissionHtml=vote.blacklisted
+  const blacklisted=vote.blacklisted
     ?`
       <p class="form-message error-text">
         你目前被列入本投票黑名單，
@@ -439,22 +566,23 @@ function renderVoteDetail_(vote,preservedIndexes){
   detail.innerHTML=`
     <h2>${escapeHtml_(vote.id)}</h2>
     <div class="markdown-content">
-      ${vote.markdownHtml||''}
+      ${vote.markdownHtml||
+        escapeHtml_(vote.markdown||'')}
     </div>
-    ${voteStatusHtml}
+    ${recordHtml}
     <div class="vote-meta">
       <span class="badge">
         ${vote.multiSelect?'複選':'單選'}
       </span>
-      ${statusHtml}
-      <span>
-        截止日期：${escapeHtml_(vote.deadline||'無')}
-      </span>
-      <span>
-        投票人數：${escapeHtml_(vote.voterCount||0)}
-      </span>
+      ${status}
+      <span>截止日期：${escapeHtml_(
+        vote.deadline||'無'
+      )}</span>
+      <span>投票人數：${escapeHtml_(
+        vote.voterCount||0
+      )}</span>
     </div>
-    ${permissionHtml}
+    ${blacklisted}
   `;
 
   formArea.innerHTML='';
@@ -463,70 +591,62 @@ function renderVoteDetail_(vote,preservedIndexes){
   form.className='vote-options';
 
   options.forEach((option,index)=>{
-    const optionNumber=index+1;
-    const count=Number(counts[index]||0);
+    const number=index+1;
     const label=document.createElement('label');
     const input=document.createElement('input');
-    const optionLabel=document.createElement('span');
-    const countElement=document.createElement('span');
+    const text=document.createElement('span');
+    const count=document.createElement('span');
 
     label.className='vote-option';
-
-    input.type=vote.multiSelect
-      ?'checkbox'
-      :'radio';
-
+    input.type=vote.multiSelect?'checkbox':'radio';
     input.name='vote-option';
-    input.value=String(optionNumber);
+    input.value=String(number);
     input.dataset.snapshot=String(option);
-    input.checked=
-      selectedIndexes.indexOf(optionNumber)!==-1;
+    input.checked=selectedIndexes.includes(number);
     input.disabled=!canVote;
 
-    optionLabel.className='vote-option-label';
-    optionLabel.textContent=option;
+    text.className='vote-option-label';
+    text.textContent=option;
 
-    countElement.className='vote-option-count';
-    countElement.textContent=count+' 票';
+    count.className='vote-option-count';
+    count.textContent=Number(counts[index]||0)+' 票';
 
-    label.append(input,optionLabel,countElement);
+    label.append(input,text,count);
     form.appendChild(label);
   });
 
   formArea.appendChild(form);
 
-  const submitButton=
-    document.getElementById('submit-vote-button');
+  const submit=document.getElementById(
+    'submit-vote-button'
+  );
+  const add=document.getElementById(
+    'add-option-button'
+  );
 
-  const addOptionButton=
-    document.getElementById('add-option-button');
+  if(submit)
+    submit.textContent=record.hasVoted
+      ?'修改投票'
+      :'送出投票';
 
-  if(submitButton)
-    submitButton.textContent=
-      myRecord.hasVoted
-        ?'修改投票'
-        :'送出投票';
-
-  if(addOptionButton)
-    addOptionButton.disabled=!canVote;
+  if(add)add.disabled=!canVote;
 
   同步投票操作狀態_();
   顯示訊息_('');
 }
 
 /* =========================================================
- * 投票送出
+ * 投票操作
  * ========================================================= */
 
 async function 送出投票_(){
   if(!state.currentVote)return;
 
-  const submitButton=
-    document.getElementById('submit-vote-button');
+  const submit=document.getElementById(
+    'submit-vote-button'
+  );
 
-  if(submitButton&&submitButton.disabled)return;
-
-  const voteId=state.currentVote.id;
+  if(submit&&submit.disabled)return;
 
   const inputs=Array.from(document.querySelectorAll(
     '#vote-form-area input[name="vote-option"]:checked'
@@ -540,12 +660,10 @@ async function 送出投票_(){
     input=>input.dataset.snapshot||''
   );
 
+  const voteId=state.currentVote.id;
+
   try{
     設定投票操作中_(true);
-
-    if(submitButton)
-      submitButton.textContent='送出中……';
-
     顯示訊息_('正在送出投票，請稍候……');
 
     const data=await apiRequest_('submitVote',{
@@ -557,7 +675,6 @@ async function 送出投票_(){
     if(!data||!data.vote)
       throw new Error('後端未回傳更新後的投票資料');
 
-    // 直接使用 submitVote 回傳資料，不重新呼叫 getVote。
     state.currentVote=data.vote;
     renderVoteDetail_(state.currentVote);
     顯示訊息_(data.message||'投票成功');
@@ -567,89 +684,71 @@ async function 送出投票_(){
       operation:data.operation||''
     });
   }catch(error){
+    顯示訊息_(error.message||'投票失敗',true);
     frontLog_('vote.submit.failed',{
       voteId,
       message:error.message
     });
-
-    顯示訊息_(error.message||'投票失敗',true);
   }finally{
     設定投票操作中_(false);
   }
 }
 
-function 設定投票操作中_(isBusy){
-  state.operationBusy=Boolean(isBusy);
+function 設定投票操作中_(busy){
+  state.operationBusy=Boolean(busy);
   同步投票操作狀態_();
 }
 
 function 同步投票操作狀態_(){
   const vote=state.currentVote;
-  const isBusy=state.operationBusy;
+  const busy=state.operationBusy;
+  const closed=vote&&是否已截止_(vote);
 
-  const submitButton=
-    document.getElementById('submit-vote-button');
-
-  const addOptionButton=
-    document.getElementById('add-option-button');
-
-  const printButton=
-    document.getElementById('print-button');
+  const submit=document.getElementById(
+    'submit-vote-button'
+  );
+  const add=document.getElementById(
+    'add-option-button'
+  );
+  const print=document.getElementById(
+    'print-button'
+  );
 
   const canVote=Boolean(
     vote&&
-    vote.closed!==true&&
+    !closed&&
     vote.canVote!==false&&
     vote.blacklisted!==true
   );
 
-  const canAddOption=Boolean(
+  const canAdd=Boolean(
     vote&&
-    vote.closed!==true&&
+    !closed&&
     vote.canAddOption!==false&&
     vote.blacklisted!==true
   );
 
-  if(submitButton){
-    submitButton.disabled=isBusy||!canVote;
+  if(submit)
+    submit.disabled=busy||!canVote;
 
-    if(isBusy)
-      submitButton.textContent='處理中，請稍候……';
-    else if(vote)
-      submitButton.textContent=
-        vote.myRecord&&vote.myRecord.hasVoted
-          ?'修改投票'
-          :'送出投票';
-  }
+  if(add)
+    add.disabled=busy||!canAdd;
 
-  if(addOptionButton)
-    addOptionButton.disabled=
-      isBusy||!canAddOption;
-
-  if(printButton)
-    printButton.disabled=isBusy||!vote;
+  if(print)
+    print.disabled=busy||!vote;
 
   document.querySelectorAll(
     '#vote-form-area input[name="vote-option"]'
   ).forEach(input=>{
-    input.disabled=isBusy||!canVote;
+    input.disabled=busy||!canVote;
   });
 
-  const saveButton=
-    document.getElementById('save-option-button');
+  const save=document.getElementById(
+    'save-option-button'
+  );
 
-  if(saveButton)
-    saveButton.disabled=isBusy||!canAddOption;
-}
-
-async function 重新載入目前投票_(voteId){
-  const data=await apiRequest_('getVote',{voteId});
-
-  if(!data||!data.vote)
-    throw new Error('後端未回傳有效投票資料');
-
-  state.currentVote=data.vote;
-  renderVoteDetail_(state.currentVote);
+  if(save)
+    save.disabled=busy||!canAdd;
 }
 
 /* =========================================================
@@ -657,62 +756,64 @@ async function 重新載入目前投票_(voteId){
  * ========================================================= */
 
 function 顯示新增選項_(){
-  if(!state.currentVote)return;
-
   const vote=state.currentVote;
 
-  const canAddOption=
-    state.operationBusy!==true&&
-    vote.closed!==true&&
-    vote.canAddOption!==false&&
-    vote.blacklisted!==true;
+  if(!vote)return;
 
-  if(!canAddOption){
+  if(
+    state.operationBusy||
+    是否已截止_(vote)||
+    vote.canAddOption===false||
+    vote.blacklisted===true
+  ){
     顯示訊息_('目前無法新增選項',true);
     return;
   }
 
-  if(document.getElementById('new-option-box'))return;
+  if(document.getElementById('new-option-box'))
+    return;
 
   const box=document.createElement('div');
+  const input=document.createElement('input');
+  const button=document.createElement('button');
+
   box.id='new-option-box';
   box.className='add-option-box';
 
-  const input=document.createElement('input');
   input.id='new-option-input';
   input.type='text';
   input.maxLength=200;
   input.placeholder='請輸入新選項';
 
-  const saveButton=document.createElement('button');
-  saveButton.id='save-option-button';
-  saveButton.className='button';
-  saveButton.type='button';
-  saveButton.textContent='儲存';
-  saveButton.addEventListener('click',新增選項_);
+  button.id='save-option-button';
+  button.className='button';
+  button.type='button';
+  button.textContent='儲存';
+  button.addEventListener('click',新增選項_);
 
-  box.append(input,saveButton);
+  box.append(input,button);
 
-  const formArea=
-    document.getElementById('vote-form-area');
+  const area=document.getElementById(
+    'vote-form-area'
+  );
 
-  if(formArea){
-    formArea.appendChild(box);
+  if(area){
+    area.appendChild(box);
     input.focus();
     同步投票操作狀態_();
   }
 }
 
 async function 新增選項_(){
-  if(!state.currentVote)return;
+  const vote=state.currentVote;
+  const input=document.getElementById(
+    'new-option-input'
+  );
+  const button=document.getElementById(
+    'save-option-button'
+  );
 
-  const input=
-    document.getElementById('new-option-input');
-
-  const saveButton=
-    document.getElementById('save-option-button');
-
-  if(!input||!saveButton)return;
+  if(!vote||!input||!button)return;
 
   const optionText=input.value.trim();
 
@@ -721,16 +822,14 @@ async function 新增選項_(){
     return;
   }
 
-  if(saveButton.disabled)return;
+  if(button.disabled)return;
 
-  const voteId=state.currentVote.id;
-  const preservedIndexes=取得目前勾選行號_();
+  const voteId=vote.id;
+  const preserved=取得目前勾選行號_();
 
   try{
     設定投票操作中_(true);
-
-    saveButton.disabled=true;
-    saveButton.textContent='新增中……';
+    button.textContent='新增中……';
     顯示訊息_('正在新增選項，請稍候……');
 
     const data=await apiRequest_('addOption',{
@@ -741,56 +840,24 @@ async function 新增選項_(){
     if(!data||!Array.isArray(data.options))
       throw new Error('後端未回傳更新後的選項');
 
-    // 保留原有票數，新增選項的票數從 0 開始。
-    const oldCounts=Array.isArray(
-      state.currentVote.counts
-    )
-      ?state.currentVote.counts
+    const oldCounts=Array.isArray(vote.counts)
+      ?vote.counts
       :[];
 
-    state.currentVote=Object.assign(
-      {},
-      state.currentVote,
-      {
-        options:data.options,
-        counts:data.options.map(
-          (_,index)=>oldCounts[index]||0
-        )
-      }
-    );
+    state.currentVote=Object.assign({},vote,{
+      options:data.options,
+      counts:data.options.map(
+        (_,index)=>oldCounts[index]||0
+      )
+    });
 
-    renderVoteDetail_(
-      state.currentVote,
-      preservedIndexes
-    );
-
+    renderVoteDetail_(state.currentVote,preserved);
     移除新增選項區塊_();
     顯示訊息_('新增選項成功');
-
-    frontLog_('option.add.completed',{
-      voteId,
-      optionCount:data.options.length
-    });
   }catch(error){
-    frontLog_('option.add.failed',{
-      voteId,
-      message:error.message
-    });
-
-    顯示訊息_(
-      error.message||'新增選項失敗',
-      true
-    );
+    顯示訊息_(error.message||'新增選項失敗',true);
   }finally{
     設定投票操作中_(false);
-
-    const currentSaveButton=
-      document.getElementById('save-option-button');
-
-    if(currentSaveButton)
-      currentSaveButton.textContent='新增選項';
-
-    同步投票操作狀態_();
   }
 }
 
@@ -834,48 +901,27 @@ async function 列印投票_(){
     `);
 
     printWindow.document.close();
-
     設定投票操作中_(true);
 
     const data=await apiRequest_('getPrintData',{
       voteId:state.currentVote.id
     });
 
-    /*
-     * 列印視窗是獨立頁面，必須明確載入 style.css。
-     * style.css 請與 app.js 位於同一個網頁路徑。
-     */
     const styleUrl=new URL(
       'style.css',
       document.baseURI
     ).href;
 
-    const printHtml=建立列印HTML_(
-      data,
-      styleUrl
-    );
-
     printWindow.document.open();
-    printWindow.document.write(printHtml);
+    printWindow.document.write(
+      建立列印HTML_(data,styleUrl)
+    );
     printWindow.document.close();
     printWindow.focus();
-
-    frontLog_('print.completed',{
-      voteId:state.currentVote.id,
-      printVersion:'style-css'
-    });
-
     printWindow.print();
   }catch(error){
     if(printWindow&&!printWindow.closed)
       printWindow.close();
-
-    frontLog_('print.failed',{
-      voteId:state.currentVote
-        ?state.currentVote.id
-        :'',
-      message:error.message
-    });
 
     顯示訊息_(error.message,true);
   }finally{
@@ -900,29 +946,20 @@ function 建立列印HTML_(data,styleUrl){
     ?result.counts
     :[];
 
-  const detailsHtml=details.length
-    ?details.map(item=>{
-      const snapshots=Array.isArray(item.snapshots)
-        ?item.snapshots
-        :[];
-
-      return`
-        <tr>
-          <td>
-            ${escapeHtml_(
-              item.displayName||
-              item.userId||
-              ''
-            )}
-          </td>
-          <td>
-            ${snapshots.map(escapeHtml_).join('<br>')}
-          </td>
-          <td>${escapeHtml_(item.createdAt||'')}</td>
-          <td>${escapeHtml_(item.updatedAt||'')}</td>
-        </tr>
-      `;
-    }).join('')
+  const detailHtml=details.length
+    ?details.map(item=>`
+      <tr>
+        <td>${escapeHtml_(
+          item.displayName||item.userId||''
+        )}</td>
+        <td>${(Array.isArray(item.snapshots)
+          ?item.snapshots
+          :[]
+        ).map(escapeHtml_).join('<br>')}</td>
+        <td>${escapeHtml_(item.createdAt||'')}</td>
+        <td>${escapeHtml_(item.updatedAt||'')}</td>
+      </tr>
+    `).join('')
     :`
       <tr>
         <td class="empty-cell" colspan="4">
@@ -935,9 +972,7 @@ function 建立列印HTML_(data,styleUrl){
     ?options.map((option,index)=>`
       <tr>
         <td>
-          <span class="option-number">
-            ${index+1}
-          </span>
+          <span class="option-number">${index+1}</span>
           ${escapeHtml_(option)}
         </td>
         <td class="vote-count">
@@ -956,7 +991,6 @@ function 建立列印HTML_(data,styleUrl){
   const systemName=escapeHtml_(
     data.systemName||'線上投票系統'
   );
-
   const voteId=escapeHtml_(vote.id||'');
 
   return`
@@ -964,17 +998,12 @@ function 建立列印HTML_(data,styleUrl){
     <html lang="zh-Hant">
     <head>
       <meta charset="UTF-8">
-      <meta
-        name="viewport"
-        content="width=device-width,initial-scale=1"
-      >
+      <meta name="viewport"
+        content="width=device-width,initial-scale=1">
       <title>${voteId}｜${systemName}</title>
-      <link
-        rel="stylesheet"
-        href="${escapeHtml_(styleUrl)}"
-      >
+      <link rel="stylesheet"
+        href="${escapeHtml_(styleUrl)}">
     </head>
-
     <body class="print-page">
       <main id="print-report-v2">
         <header class="print-report-header">
@@ -994,46 +1023,29 @@ function 建立列印HTML_(data,styleUrl){
         <section class="print-summary">
           <div class="print-summary-card">
             <span>投票狀態</span>
-            <strong>
-              ${escapeHtml_(vote.status||'')}
-            </strong>
+            <strong>${escapeHtml_(vote.status||'')}</strong>
           </div>
-
           <div class="print-summary-card">
             <span>投票方式</span>
-            <strong>
-              ${vote.multiSelect?'複選':'單選'}
-            </strong>
+            <strong>${vote.multiSelect?'複選':'單選'}</strong>
           </div>
-
           <div class="print-summary-card">
             <span>截止日期</span>
-            <strong>
-              ${escapeHtml_(vote.deadline||'無')}
-            </strong>
+            <strong>${escapeHtml_(vote.deadline||'無')}</strong>
           </div>
-
           <div class="print-summary-card">
             <span>投票人數</span>
-            <strong>
-              ${Number(
-                result.voterCount||
-                vote.voterCount||
-                0
-              )}
-            </strong>
+            <strong>${Number(
+              result.voterCount||vote.voterCount||0
+            )}</strong>
           </div>
         </section>
 
         <section class="print-report-section">
           <h2>投票結果</h2>
-
           <table>
             <thead>
-              <tr>
-                <th>選項</th>
-                <th>票數</th>
-              </tr>
+              <tr><th>選項</th><th>票數</th></tr>
             </thead>
             <tbody>${resultHtml}</tbody>
           </table>
@@ -1041,7 +1053,6 @@ function 建立列印HTML_(data,styleUrl){
 
         <section class="print-report-section">
           <h2>投票明細</h2>
-
           <table>
             <thead>
               <tr>
@@ -1051,7 +1062,7 @@ function 建立列印HTML_(data,styleUrl){
                 <th>最後修改時間</th>
               </tr>
             </thead>
-            <tbody>${detailsHtml}</tbody>
+            <tbody>${detailHtml}</tbody>
           </table>
         </section>
 
@@ -1078,19 +1089,20 @@ function 顯示畫面_(id){
 }
 
 function 顯示錯誤_(message){
-  const errorMessage=
-    document.getElementById('error-message');
+  const element=document.getElementById(
+    'error-message'
+  );
 
-  if(errorMessage)
-    errorMessage.textContent=
-      message||'系統發生錯誤';
+  if(element)
+    element.textContent=message||'系統發生錯誤';
 
   顯示畫面_('error-view');
 }
 
 function 顯示訊息_(message,isError){
-  const element=
-    document.getElementById('vote-message');
+  const element=document.getElementById(
+    'vote-message'
+  );
 
   if(!element)return;
 
