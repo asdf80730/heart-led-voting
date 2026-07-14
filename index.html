@@ -31,7 +31,13 @@
       <div class="message error">
         <h2>發生錯誤</h2>
         <p id="error-message"></p>
-        <button id="retry-button" class="button">重新整理</button>
+        <button
+          id="retry-button"
+          class="button"
+          type="button"
+        >
+          重新整理
+        </button>
       </div>
     </section>
 
@@ -56,7 +62,12 @@
     <section id="vote-list-view" class="view hidden">
       <div class="section-title">
         <h2>目前投票</h2>
-        <button id="refresh-button" class="button secondary">
+
+        <button
+          id="refresh-button"
+          class="button secondary"
+          type="button"
+        >
           重新整理
         </button>
       </div>
@@ -65,53 +76,53 @@
     </section>
 
     <section id="vote-detail-view" class="view hidden">
-      <button id="back-list-button" class="button secondary">
+      <button
+        id="back-list-button"
+        class="button secondary"
+        type="button"
+      >
         ← 返回投票列表
       </button>
 
-      <article id="vote-detail" class="card"></article>
+      <article
+        id="vote-detail"
+        class="card"
+      ></article>
 
       <div id="vote-form-area"></div>
 
       <div class="action-row">
-        <button id="submit-vote-button" class="button primary">
+        <button
+          id="submit-vote-button"
+          class="button primary"
+          type="button"
+        >
           送出投票
         </button>
 
-        <button id="add-option-button" class="button secondary">
+        <button
+          id="add-option-button"
+          class="button secondary"
+          type="button"
+        >
           新增選項
         </button>
 
-        <button id="result-button" class="button secondary">
-          查看結果
-        </button>
-
-        <button id="details-button" class="button secondary">
-          查看明細
-        </button>
-
-        <button id="print-button" class="button secondary">
-          列印
+        <button
+          id="print-button"
+          class="button secondary"
+          type="button"
+        >
+          列印結果及明細
         </button>
       </div>
 
-      <p id="vote-message" class="form-message"></p>
-    </section>
-
-    <section id="result-view" class="view hidden">
-      <button id="back-vote-button" class="button secondary">
-        ← 返回投票
-      </button>
-
-      <article id="result-content" class="card"></article>
-    </section>
-
-    <section id="details-view" class="view hidden">
-      <button id="back-vote-from-details-button" class="button secondary">
-        ← 返回投票
-      </button>
-
-      <article id="details-content" class="card"></article>
+      <p
+        id="vote-message"
+        class="form-message"
+        role="status"
+        aria-live="polite"
+      ></p>
     </section>
   </main>
 </body>
