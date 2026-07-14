@@ -190,10 +190,6 @@ async function apiRequest_(action, payload) {
     payload: payload || {}
   };
 
-  const requestBody =
-    'payload=' +
-    encodeURIComponent(JSON.stringify(body));
-
   frontLog_('api.request.start', {
     requestId: requestId,
     action: action
@@ -204,19 +200,20 @@ async function apiRequest_(action, payload) {
       APP_CONFIG.GAS_API_URL,
       {
         method: 'POST',
-        body: requestBody,
+        body: new URLSearchParams({
+          payload: JSON.stringify(body)
+        }),
         redirect: 'follow',
         cache: 'no-store'
       }
     );
 
     const rawText = await response.text();
-
     let result;
 
     try {
       result = JSON.parse(rawText);
-    } catch (parseError) {
+    } catch (error) {
       throw new Error(
         'API 回傳內容不是有效 JSON：' +
         rawText.slice(0, 200)
@@ -240,8 +237,7 @@ async function apiRequest_(action, payload) {
 
     if (!response.ok) {
       throw new Error(
-        'API HTTP 錯誤：' +
-        response.status
+        'API HTTP 錯誤：' + response.status
       );
     }
 
@@ -257,14 +253,12 @@ async function apiRequest_(action, payload) {
     return result.data;
 
   } catch (error) {
-    const durationMs = Math.round(
-      performance.now() - startTime
-    );
-
     frontLog_('api.request.failed', {
       requestId: requestId,
       action: action,
-      durationMs: durationMs,
+      durationMs: Math.round(
+        performance.now() - startTime
+      ),
       message: error.message
     });
 
