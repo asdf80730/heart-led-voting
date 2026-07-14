@@ -58,7 +58,6 @@ function 重新登入_(){
     }
 
     if(liff.isLoggedIn())liff.logout();
-
     liff.login({redirectUri:window.location.href});
   }catch(error){
     frontLog_('liff.relogin.failed',{message:error.message});
@@ -126,10 +125,19 @@ async function 初始化LIFF_(){
 function 更新系統及使用者資訊_(data){
   const systemNameElement=document.getElementById('system-name');
   const userInfoElement=document.getElementById('user-info');
-  const user=data.user||{};
+
+  /*
+   * getVotes 可能沒有回傳 user。
+   * 因此優先使用本次資料，沒有時沿用 bootstrap 的使用者資料。
+   */
+  const sessionUser=state.session&&state.session.user;
+  const user=data&&data.user||sessionUser||{};
 
   if(systemNameElement)
-    systemNameElement.textContent=data.systemName||'線上投票系統';
+    systemNameElement.textContent=
+      data&&data.systemName||
+      state.session&&state.session.systemName||
+      '線上投票系統';
 
   if(userInfoElement)
     userInfoElement.textContent=
@@ -237,7 +245,19 @@ async function 載入投票列表_(){
     const data=await apiRequest_('getVotes',{});
 
     state.votes=Array.isArray(data.votes)?data.votes:[];
-    更新系統及使用者資訊_(data);
+
+    /*
+     * getVotes 可能只回傳 votes。
+     * 合併資料時保留 bootstrap 的 user 與 systemName，
+     * 避免首頁重新整理後顯示「使用者：｜狀態：」。
+     */
+    state.session=Object.assign({},state.session||{},data,{
+      user:data.user||
+        state.session&&state.session.user||
+        {}
+    });
+
+    更新系統及使用者資訊_(state.session);
     renderVoteList_(state.votes);
     顯示畫面_('vote-list-view');
   }catch(error){
