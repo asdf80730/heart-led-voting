@@ -4,10 +4,16 @@
  * 本檔案採用省 Token 的精簡排版方式：
  * 只壓縮排版，不刪除主要功能；
  * 保留基本可讀性與重要註解；
- * 不將程式完全壓成一行。
+ * 列印版 CSS 由 style.css 統一管理。
  */
 
-const state={idToken:'',session:null,votes:[],currentVote:null,operationBusy:false};
+const state={
+  idToken:'',
+  session:null,
+  votes:[],
+  currentVote:null,
+  operationBusy:false
+};
 
 document.addEventListener('DOMContentLoaded',()=>{
   綁定事件_();
@@ -19,7 +25,6 @@ document.addEventListener('DOMContentLoaded',()=>{
  * ========================================================= */
 
 function 綁定事件_(){
-  // 依使用者要求，維持省 Token 編排。
   綁定元素事件_('retry-button','click',重新登入_);
   綁定元素事件_('refresh-button','click',載入投票列表_);
 
@@ -43,7 +48,7 @@ function 綁定元素事件_(id,eventName,handler){
 
 /**
  * 錯誤頁面的「重新整理」按鈕：
- * 清除目前登入狀態，登出 LIFF，再重新登入以取得新的 ID Token。
+ * 清除目前登入狀態，登出 LIFF，再重新登入。
  */
 function 重新登入_(){
   state.idToken='';
@@ -115,7 +120,9 @@ async function 初始化LIFF_(){
     renderVoteList_(state.votes);
     顯示畫面_('vote-list-view');
 
-    frontLog_('bootstrap.completed',{voteCount:state.votes.length});
+    frontLog_('bootstrap.completed',{
+      voteCount:state.votes.length
+    });
   }catch(error){
     frontLog_('bootstrap.failed',{message:error.message});
     顯示錯誤_(error.message||'初始化失敗');
@@ -146,14 +153,25 @@ function 更新系統及使用者資訊_(data){
 }
 
 function 顯示未授權畫面_(user){
-  const userIdElement=document.getElementById('unauthorized-user-id');
-  const disabledUserIdElement=document.getElementById('disabled-user-id');
+  const unauthorizedElement=
+    document.getElementById('unauthorized-user-id');
+
+  const disabledElement=
+    document.getElementById('disabled-user-id');
+
   const userId=user.userId||'';
 
-  if(userIdElement)userIdElement.textContent='LINE User ID：'+userId;
-  if(disabledUserIdElement)disabledUserIdElement.textContent='LINE User ID：'+userId;
+  if(unauthorizedElement)
+    unauthorizedElement.textContent='LINE User ID：'+userId;
 
-  顯示畫面_(user.status==='停用'?'disabled-view':'unauthorized-view');
+  if(disabledElement)
+    disabledElement.textContent='LINE User ID：'+userId;
+
+  顯示畫面_(
+    user.status==='停用'
+      ?'disabled-view'
+      :'unauthorized-view'
+  );
 }
 
 /* =========================================================
@@ -176,7 +194,9 @@ async function apiRequest_(action,payload){
   try{
     const response=await fetch(APP_CONFIG.GAS_API_URL,{
       method:'POST',
-      body:new URLSearchParams({payload:JSON.stringify(body)})
+      body:new URLSearchParams({
+        payload:JSON.stringify(body)
+      })
     });
 
     const result=await response.json();
@@ -188,7 +208,9 @@ async function apiRequest_(action,payload){
       httpStatus:response.status,
       ok:result.ok,
       durationMs,
-      serverMs:result.meta?result.meta.durationMs||null:null
+      serverMs:result.meta
+        ?result.meta.durationMs||null
+        :null
     });
 
     if(!response.ok)
@@ -214,10 +236,13 @@ async function apiRequest_(action,payload){
 }
 
 function 建立RequestId_(){
-  if(window.crypto&&typeof window.crypto.randomUUID==='function')
+  if(window.crypto&&
+    typeof window.crypto.randomUUID==='function'
+  )
     return window.crypto.randomUUID();
 
-  return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+  return Date.now().toString(36)+'-'+
+    Math.random().toString(36).slice(2);
 }
 
 function frontLog_(event,data){
@@ -228,7 +253,11 @@ function frontLog_(event,data){
     data:data||{}
   };
 
-  console.info('[投票系統]',event,JSON.stringify(record.data));
+  console.info(
+    '[投票系統]',
+    event,
+    JSON.stringify(record.data)
+  );
 }
 
 /* =========================================================
@@ -244,18 +273,24 @@ async function 載入投票列表_(){
 
     const data=await apiRequest_('getVotes',{});
 
-    state.votes=Array.isArray(data.votes)?data.votes:[];
+    state.votes=Array.isArray(data.votes)
+      ?data.votes
+      :[];
 
     /*
      * getVotes 可能只回傳 votes。
-     * 合併資料時保留 bootstrap 的 user 與 systemName，
-     * 避免首頁重新整理後顯示「使用者：｜狀態：」。
+     * 合併資料時保留 bootstrap 的 user 與 systemName。
      */
-    state.session=Object.assign({},state.session||{},data,{
-      user:data.user||
-        state.session&&state.session.user||
-        {}
-    });
+    state.session=Object.assign(
+      {},
+      state.session||{},
+      data,
+      {
+        user:data.user||
+          state.session&&state.session.user||
+          {}
+      }
+    );
 
     更新系統及使用者資訊_(state.session);
     renderVoteList_(state.votes);
@@ -272,7 +307,8 @@ function renderVoteList_(votes){
   container.innerHTML='';
 
   if(!votes.length){
-    container.innerHTML='<div class="message">目前沒有啟用中的投票。</div>';
+    container.innerHTML=
+      '<div class="message">目前沒有啟用中的投票。</div>';
     return;
   }
 
@@ -281,7 +317,9 @@ function renderVoteList_(votes){
     item.className='vote-item';
 
     const title=document.createElement('h3');
-    title.innerHTML=vote.markdownHtml||escapeHtml_(vote.id);
+    title.innerHTML=
+      vote.markdownHtml||
+      escapeHtml_(vote.id);
 
     const meta=document.createElement('p');
     meta.textContent=
@@ -293,7 +331,10 @@ function renderVoteList_(votes){
     button.className='button';
     button.type='button';
     button.textContent='查看投票';
-    button.addEventListener('click',()=>載入單筆投票_(vote.id));
+    button.addEventListener(
+      'click',
+      ()=>載入單筆投票_(vote.id)
+    );
 
     item.append(title,meta,button);
     container.appendChild(item);
@@ -346,14 +387,20 @@ function renderVoteDetail_(vote,preservedIndexes){
     updatedAt:''
   };
 
-  const selectedIndexes=Array.isArray(preservedIndexes)
-    ?preservedIndexes
-    :Array.isArray(myRecord.selectedIndexes)
-      ?myRecord.selectedIndexes
-      :[];
+  const selectedIndexes=
+    Array.isArray(preservedIndexes)
+      ?preservedIndexes
+      :Array.isArray(myRecord.selectedIndexes)
+        ?myRecord.selectedIndexes
+        :[];
 
-  const counts=Array.isArray(vote.counts)?vote.counts:[];
-  const options=Array.isArray(vote.options)?vote.options:[];
+  const counts=Array.isArray(vote.counts)
+    ?vote.counts
+    :[];
+
+  const options=Array.isArray(vote.options)
+    ?vote.options
+    :[];
 
   const canVote=
     vote.closed!==true&&
@@ -371,7 +418,9 @@ function renderVoteDetail_(vote,preservedIndexes){
       </div>
     `
     :`
-      <div class="my-vote-status not-voted">⭕ 你尚未投票</div>
+      <div class="my-vote-status not-voted">
+        ⭕ 你尚未投票
+      </div>
     `;
 
   const statusHtml=vote.closed
@@ -381,20 +430,29 @@ function renderVoteDetail_(vote,preservedIndexes){
   const permissionHtml=vote.blacklisted
     ?`
       <p class="form-message error-text">
-        你目前被列入本投票黑名單，只能查看及列印，不能投票或新增選項。
+        你目前被列入本投票黑名單，
+        只能查看及列印，不能投票或新增選項。
       </p>
     `
     :'';
 
   detail.innerHTML=`
     <h2>${escapeHtml_(vote.id)}</h2>
-    <div class="markdown-content">${vote.markdownHtml||''}</div>
+    <div class="markdown-content">
+      ${vote.markdownHtml||''}
+    </div>
     ${voteStatusHtml}
     <div class="vote-meta">
-      <span class="badge">${vote.multiSelect?'複選':'單選'}</span>
+      <span class="badge">
+        ${vote.multiSelect?'複選':'單選'}
+      </span>
       ${statusHtml}
-      <span>截止日期：${escapeHtml_(vote.deadline||'無')}</span>
-      <span>投票人數：${escapeHtml_(vote.voterCount||0)}</span>
+      <span>
+        截止日期：${escapeHtml_(vote.deadline||'無')}
+      </span>
+      <span>
+        投票人數：${escapeHtml_(vote.voterCount||0)}
+      </span>
     </div>
     ${permissionHtml}
   `;
@@ -414,11 +472,15 @@ function renderVoteDetail_(vote,preservedIndexes){
 
     label.className='vote-option';
 
-    input.type=vote.multiSelect?'checkbox':'radio';
+    input.type=vote.multiSelect
+      ?'checkbox'
+      :'radio';
+
     input.name='vote-option';
     input.value=String(optionNumber);
     input.dataset.snapshot=String(option);
-    input.checked=selectedIndexes.indexOf(optionNumber)!==-1;
+    input.checked=
+      selectedIndexes.indexOf(optionNumber)!==-1;
     input.disabled=!canVote;
 
     optionLabel.className='vote-option-label';
@@ -433,13 +495,20 @@ function renderVoteDetail_(vote,preservedIndexes){
 
   formArea.appendChild(form);
 
-  const submitButton=document.getElementById('submit-vote-button');
-  const addOptionButton=document.getElementById('add-option-button');
+  const submitButton=
+    document.getElementById('submit-vote-button');
+
+  const addOptionButton=
+    document.getElementById('add-option-button');
 
   if(submitButton)
-    submitButton.textContent=myRecord.hasVoted?'修改投票':'送出投票';
+    submitButton.textContent=
+      myRecord.hasVoted
+        ?'修改投票'
+        :'送出投票';
 
-  if(addOptionButton)addOptionButton.disabled=!canVote;
+  if(addOptionButton)
+    addOptionButton.disabled=!canVote;
 
   同步投票操作狀態_();
   顯示訊息_('');
@@ -452,22 +521,30 @@ function renderVoteDetail_(vote,preservedIndexes){
 async function 送出投票_(){
   if(!state.currentVote)return;
 
-  const submitButton=document.getElementById('submit-vote-button');
+  const submitButton=
+    document.getElementById('submit-vote-button');
 
   if(submitButton&&submitButton.disabled)return;
 
   const voteId=state.currentVote.id;
+
   const inputs=Array.from(document.querySelectorAll(
     '#vote-form-area input[name="vote-option"]:checked'
   ));
 
-  const selectedIndexes=inputs.map(input=>Number(input.value));
-  const snapshots=inputs.map(input=>input.dataset.snapshot||'');
+  const selectedIndexes=inputs.map(
+    input=>Number(input.value)
+  );
+
+  const snapshots=inputs.map(
+    input=>input.dataset.snapshot||''
+  );
 
   try{
     設定投票操作中_(true);
 
-    if(submitButton)submitButton.textContent='送出中……';
+    if(submitButton)
+      submitButton.textContent='送出中……';
 
     顯示訊息_('正在送出投票，請稍候……');
 
@@ -480,7 +557,7 @@ async function 送出投票_(){
     if(!data||!data.vote)
       throw new Error('後端未回傳更新後的投票資料');
 
-    // 直接使用 submitVote 回傳資料，不再重新呼叫 getVote。
+    // 直接使用 submitVote 回傳資料，不重新呼叫 getVote。
     state.currentVote=data.vote;
     renderVoteDetail_(state.currentVote);
     顯示訊息_(data.message||'投票成功');
@@ -490,7 +567,11 @@ async function 送出投票_(){
       operation:data.operation||''
     });
   }catch(error){
-    frontLog_('vote.submit.failed',{voteId,message:error.message});
+    frontLog_('vote.submit.failed',{
+      voteId,
+      message:error.message
+    });
+
     顯示訊息_(error.message||'投票失敗',true);
   }finally{
     設定投票操作中_(false);
@@ -506,9 +587,14 @@ function 同步投票操作狀態_(){
   const vote=state.currentVote;
   const isBusy=state.operationBusy;
 
-  const submitButton=document.getElementById('submit-vote-button');
-  const addOptionButton=document.getElementById('add-option-button');
-  const printButton=document.getElementById('print-button');
+  const submitButton=
+    document.getElementById('submit-vote-button');
+
+  const addOptionButton=
+    document.getElementById('add-option-button');
+
+  const printButton=
+    document.getElementById('print-button');
 
   const canVote=Boolean(
     vote&&
@@ -527,7 +613,8 @@ function 同步投票操作狀態_(){
   if(submitButton){
     submitButton.disabled=isBusy||!canVote;
 
-    if(isBusy)submitButton.textContent='處理中，請稍候……';
+    if(isBusy)
+      submitButton.textContent='處理中，請稍候……';
     else if(vote)
       submitButton.textContent=
         vote.myRecord&&vote.myRecord.hasVoted
@@ -535,8 +622,12 @@ function 同步投票操作狀態_(){
           :'送出投票';
   }
 
-  if(addOptionButton)addOptionButton.disabled=isBusy||!canAddOption;
-  if(printButton)printButton.disabled=isBusy||!vote;
+  if(addOptionButton)
+    addOptionButton.disabled=
+      isBusy||!canAddOption;
+
+  if(printButton)
+    printButton.disabled=isBusy||!vote;
 
   document.querySelectorAll(
     '#vote-form-area input[name="vote-option"]'
@@ -544,8 +635,11 @@ function 同步投票操作狀態_(){
     input.disabled=isBusy||!canVote;
   });
 
-  const saveButton=document.getElementById('save-option-button');
-  if(saveButton)saveButton.disabled=isBusy||!canAddOption;
+  const saveButton=
+    document.getElementById('save-option-button');
+
+  if(saveButton)
+    saveButton.disabled=isBusy||!canAddOption;
 }
 
 async function 重新載入目前投票_(voteId){
@@ -566,6 +660,7 @@ function 顯示新增選項_(){
   if(!state.currentVote)return;
 
   const vote=state.currentVote;
+
   const canAddOption=
     state.operationBusy!==true&&
     vote.closed!==true&&
@@ -598,7 +693,8 @@ function 顯示新增選項_(){
 
   box.append(input,saveButton);
 
-  const formArea=document.getElementById('vote-form-area');
+  const formArea=
+    document.getElementById('vote-form-area');
 
   if(formArea){
     formArea.appendChild(box);
@@ -610,8 +706,11 @@ function 顯示新增選項_(){
 async function 新增選項_(){
   if(!state.currentVote)return;
 
-  const input=document.getElementById('new-option-input');
-  const saveButton=document.getElementById('save-option-button');
+  const input=
+    document.getElementById('new-option-input');
+
+  const saveButton=
+    document.getElementById('save-option-button');
 
   if(!input||!saveButton)return;
 
@@ -629,6 +728,7 @@ async function 新增選項_(){
 
   try{
     設定投票操作中_(true);
+
     saveButton.disabled=true;
     saveButton.textContent='新增中……';
     顯示訊息_('正在新增選項，請稍候……');
@@ -642,16 +742,28 @@ async function 新增選項_(){
       throw new Error('後端未回傳更新後的選項');
 
     // 保留原有票數，新增選項的票數從 0 開始。
-    const oldCounts=Array.isArray(state.currentVote.counts)
+    const oldCounts=Array.isArray(
+      state.currentVote.counts
+    )
       ?state.currentVote.counts
       :[];
 
-    state.currentVote=Object.assign({},state.currentVote,{
-      options:data.options,
-      counts:data.options.map((_,index)=>oldCounts[index]||0)
-    });
+    state.currentVote=Object.assign(
+      {},
+      state.currentVote,
+      {
+        options:data.options,
+        counts:data.options.map(
+          (_,index)=>oldCounts[index]||0
+        )
+      }
+    );
 
-    renderVoteDetail_(state.currentVote,preservedIndexes);
+    renderVoteDetail_(
+      state.currentVote,
+      preservedIndexes
+    );
+
     移除新增選項區塊_();
     顯示訊息_('新增選項成功');
 
@@ -660,15 +772,24 @@ async function 新增選項_(){
       optionCount:data.options.length
     });
   }catch(error){
-    frontLog_('option.add.failed',{voteId,message:error.message});
-    顯示訊息_(error.message||'新增選項失敗',true);
+    frontLog_('option.add.failed',{
+      voteId,
+      message:error.message
+    });
+
+    顯示訊息_(
+      error.message||'新增選項失敗',
+      true
+    );
   }finally{
     設定投票操作中_(false);
 
     const currentSaveButton=
       document.getElementById('save-option-button');
 
-    if(currentSaveButton)currentSaveButton.textContent='新增選項';
+    if(currentSaveButton)
+      currentSaveButton.textContent='新增選項';
+
     同步投票操作狀態_();
   }
 }
@@ -711,6 +832,7 @@ async function 列印投票_(){
       </body>
       </html>
     `);
+
     printWindow.document.close();
 
     設定投票操作中_(true);
@@ -719,18 +841,39 @@ async function 列印投票_(){
       voteId:state.currentVote.id
     });
 
+    /*
+     * 列印視窗是獨立頁面，必須明確載入 style.css。
+     * style.css 請與 app.js 位於同一個網頁路徑。
+     */
+    const styleUrl=new URL(
+      'style.css',
+      document.baseURI
+    ).href;
+
+    const printHtml=建立列印HTML_(
+      data,
+      styleUrl
+    );
+
     printWindow.document.open();
-    printWindow.document.write(建立列印HTML_(data));
+    printWindow.document.write(printHtml);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
 
-    frontLog_('print.completed',{voteId:state.currentVote.id});
+    frontLog_('print.completed',{
+      voteId:state.currentVote.id,
+      printVersion:'style-css'
+    });
+
+    printWindow.print();
   }catch(error){
-    if(printWindow&&!printWindow.closed)printWindow.close();
+    if(printWindow&&!printWindow.closed)
+      printWindow.close();
 
     frontLog_('print.failed',{
-      voteId:state.currentVote?state.currentVote.id:'',
+      voteId:state.currentVote
+        ?state.currentVote.id
+        :'',
       message:error.message
     });
 
@@ -740,10 +883,12 @@ async function 列印投票_(){
   }
 }
 
-function 建立列印HTML_(data){
+function 建立列印HTML_(data,styleUrl){
   const vote=data.vote||{};
   const result=data.result||{};
-  const details=Array.isArray(data.details)?data.details:[];
+  const details=Array.isArray(data.details)
+    ?data.details
+    :[];
 
   const options=Array.isArray(result.options)
     ?result.options
@@ -751,7 +896,9 @@ function 建立列印HTML_(data){
       ?vote.options
       :[];
 
-  const counts=Array.isArray(result.counts)?result.counts:[];
+  const counts=Array.isArray(result.counts)
+    ?result.counts
+    :[];
 
   const detailsHtml=details.length
     ?details.map(item=>{
@@ -761,8 +908,16 @@ function 建立列印HTML_(data){
 
       return`
         <tr>
-          <td>${escapeHtml_(item.displayName||item.userId||'')}</td>
-          <td>${snapshots.map(escapeHtml_).join('<br>')}</td>
+          <td>
+            ${escapeHtml_(
+              item.displayName||
+              item.userId||
+              ''
+            )}
+          </td>
+          <td>
+            ${snapshots.map(escapeHtml_).join('<br>')}
+          </td>
           <td>${escapeHtml_(item.createdAt||'')}</td>
           <td>${escapeHtml_(item.updatedAt||'')}</td>
         </tr>
@@ -770,7 +925,9 @@ function 建立列印HTML_(data){
     }).join('')
     :`
       <tr>
-        <td class="empty-cell" colspan="4">目前沒有投票明細</td>
+        <td class="empty-cell" colspan="4">
+          目前沒有投票明細
+        </td>
       </tr>
     `;
 
@@ -778,15 +935,21 @@ function 建立列印HTML_(data){
     ?options.map((option,index)=>`
       <tr>
         <td>
-          <span class="option-number">${index+1}</span>
+          <span class="option-number">
+            ${index+1}
+          </span>
           ${escapeHtml_(option)}
         </td>
-        <td class="vote-count">${Number(counts[index]||0)} 票</td>
+        <td class="vote-count">
+          ${Number(counts[index]||0)} 票
+        </td>
       </tr>
     `).join('')
     :`
       <tr>
-        <td class="empty-cell" colspan="2">目前沒有投票結果</td>
+        <td class="empty-cell" colspan="2">
+          目前沒有投票結果
+        </td>
       </tr>
     `;
 
@@ -795,371 +958,75 @@ function 建立列印HTML_(data){
   );
 
   const voteId=escapeHtml_(vote.id||'');
-  const voteTitle=escapeHtml_(
-    vote.title||vote.name||vote.subject||''
-  );
 
   return`
     <!DOCTYPE html>
     <html lang="zh-Hant">
     <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <meta
+        name="viewport"
+        content="width=device-width,initial-scale=1"
+      >
       <title>${voteId}｜${systemName}</title>
-
-      <style>
-        :root{
-          color-scheme:light;
-          --primary:#334e68;
-          --primary-light:#eaf1f7;
-          --text:#263238;
-          --muted:#667085;
-          --border:#d9e1e8;
-          --line:#e7edf2;
-          --surface:#ffffff;
-          --background:#f5f7fa;
-        }
-
-        *{
-          box-sizing:border-box;
-        }
-
-        body{
-          margin:0;
-          color:var(--text);
-          background:var(--background);
-          font-family:
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            "Noto Sans TC",
-            "Microsoft JhengHei",
-            sans-serif;
-          line-height:1.7;
-        }
-
-        .page{
-          width:min(100% - 32px,1100px);
-          margin:32px auto;
-        }
-
-        .print-header{
-          position:relative;
-          overflow:hidden;
-          color:#fff;
-          background:
-            linear-gradient(135deg,#243b53,#486581);
-          border-radius:18px;
-          padding:32px 36px;
-          box-shadow:0 10px 28px rgba(36,59,83,.16);
-        }
-
-        .print-header::after{
-          content:"";
-          position:absolute;
-          width:220px;
-          height:220px;
-          right:-70px;
-          top:-100px;
-          border:32px solid rgba(255,255,255,.1);
-          border-radius:50%;
-        }
-
-        .system-name{
-          position:relative;
-          z-index:1;
-          margin:0 0 10px;
-          font-size:clamp(24px,4vw,36px);
-          font-weight:800;
-          letter-spacing:.04em;
-        }
-
-        .report-label{
-          position:relative;
-          z-index:1;
-          margin:0;
-          color:#d9e8f3;
-          font-size:14px;
-        }
-
-        .vote-heading{
-          margin:24px 0 16px;
-        }
-
-        .vote-id{
-          margin:0;
-          color:var(--primary);
-          font-size:clamp(24px,4vw,32px);
-          font-weight:800;
-          letter-spacing:.03em;
-        }
-
-        .vote-title{
-          margin:6px 0 0;
-          color:var(--muted);
-          font-size:16px;
-        }
-
-        .markdown-content{
-          margin:20px 0;
-          padding:20px 22px;
-          background:var(--surface);
-          border:1px solid var(--border);
-          border-left:5px solid var(--primary);
-          border-radius:12px;
-        }
-
-        .summary{
-          display:grid;
-          grid-template-columns:repeat(4,minmax(0,1fr));
-          gap:12px;
-          margin:20px 0 28px;
-        }
-
-        .summary-item{
-          min-height:86px;
-          padding:14px 16px;
-          background:var(--surface);
-          border:1px solid var(--border);
-          border-radius:12px;
-        }
-
-        .summary-label{
-          display:block;
-          margin-bottom:4px;
-          color:var(--muted);
-          font-size:13px;
-        }
-
-        .summary-value{
-          display:block;
-          color:var(--text);
-          font-size:16px;
-          font-weight:700;
-        }
-
-        .section{
-          margin-top:28px;
-          background:var(--surface);
-          border:1px solid var(--border);
-          border-radius:14px;
-          overflow:hidden;
-        }
-
-        .section-title{
-          display:flex;
-          align-items:center;
-          gap:10px;
-          margin:0;
-          padding:16px 20px;
-          color:var(--primary);
-          background:var(--primary-light);
-          font-size:20px;
-          font-weight:800;
-        }
-
-        .section-title::before{
-          content:"";
-          width:5px;
-          height:22px;
-          background:var(--primary);
-          border-radius:5px;
-        }
-
-        table{
-          width:100%;
-          border-collapse:collapse;
-          font-size:14px;
-        }
-
-        th{
-          color:#40566d;
-          background:#f1f5f8;
-          font-weight:800;
-          white-space:nowrap;
-        }
-
-        th,td{
-          padding:13px 16px;
-          border-bottom:1px solid var(--line);
-          text-align:left;
-          vertical-align:top;
-        }
-
-        tbody tr:last-child td{
-          border-bottom:0;
-        }
-
-        tbody tr:nth-child(even){
-          background:#fbfcfd;
-        }
-
-        tbody tr:hover{
-          background:#f2f7fb;
-        }
-
-        .option-number{
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          width:26px;
-          height:26px;
-          margin-right:8px;
-          color:#fff;
-          background:var(--primary);
-          border-radius:50%;
-          font-size:12px;
-          font-weight:800;
-        }
-
-        .vote-count{
-          color:var(--primary);
-          font-weight:800;
-          white-space:nowrap;
-        }
-
-        .empty-cell{
-          padding:24px;
-          color:var(--muted);
-          text-align:center;
-        }
-
-        .print-footer{
-          margin-top:24px;
-          color:var(--muted);
-          font-size:12px;
-          text-align:right;
-        }
-
-        @media(max-width:720px){
-          .page{
-            width:min(100% - 20px,1100px);
-            margin:16px auto;
-          }
-
-          .print-header{
-            padding:24px;
-            border-radius:14px;
-          }
-
-          .summary{
-            grid-template-columns:repeat(2,minmax(0,1fr));
-          }
-
-          .section{
-            overflow-x:auto;
-          }
-
-          table{
-            min-width:620px;
-          }
-        }
-
-        @media print{
-          @page{
-            size:A4;
-            margin:14mm;
-          }
-
-          body{
-            background:#fff;
-          }
-
-          .page{
-            width:100%;
-            margin:0;
-          }
-
-          .print-header{
-            color:#000;
-            background:#fff;
-            border:2px solid var(--primary);
-            box-shadow:none;
-          }
-
-          .print-header::after{
-            display:none;
-          }
-
-          .report-label{
-            color:var(--muted);
-          }
-
-          .section{
-            break-inside:avoid;
-            box-shadow:none;
-          }
-
-          .section-title{
-            break-after:avoid;
-          }
-
-          thead{
-            display:table-header-group;
-          }
-
-          tr{
-            break-inside:avoid;
-          }
-
-          .print-footer{
-            display:block;
-          }
-        }
-      </style>
+      <link
+        rel="stylesheet"
+        href="${escapeHtml_(styleUrl)}"
+      >
     </head>
 
-    <body>
-      <main class="page">
-        <header class="print-header">
-          <h1 class="system-name">${systemName}</h1>
-          <p class="report-label">投票結果與明細報告</p>
+    <body class="print-page">
+      <main id="print-report-v2">
+        <header class="print-report-header">
+          <h1>${systemName}</h1>
+          <p>投票結果與明細報告</p>
         </header>
 
-        <section class="vote-heading">
-          <h2 class="vote-id">${voteId}</h2>
-          ${voteTitle
-            ?`<p class="vote-title">${voteTitle}</p>`
-            :''
-          }
+        <section class="print-vote-heading">
+          <h2>${voteId}</h2>
+          <p>投票報告</p>
         </section>
 
-        <div class="markdown-content">
+        <div class="print-description">
           ${vote.markdownHtml||''}
         </div>
 
-        <section class="summary">
-          <div class="summary-item">
-            <span class="summary-label">投票狀態</span>
-            <span class="summary-value">
+        <section class="print-summary">
+          <div class="print-summary-card">
+            <span>投票狀態</span>
+            <strong>
               ${escapeHtml_(vote.status||'')}
-            </span>
+            </strong>
           </div>
 
-          <div class="summary-item">
-            <span class="summary-label">投票方式</span>
-            <span class="summary-value">
+          <div class="print-summary-card">
+            <span>投票方式</span>
+            <strong>
               ${vote.multiSelect?'複選':'單選'}
-            </span>
+            </strong>
           </div>
 
-          <div class="summary-item">
-            <span class="summary-label">截止日期</span>
-            <span class="summary-value">
+          <div class="print-summary-card">
+            <span>截止日期</span>
+            <strong>
               ${escapeHtml_(vote.deadline||'無')}
-            </span>
+            </strong>
           </div>
 
-          <div class="summary-item">
-            <span class="summary-label">投票人數</span>
-            <span class="summary-value">
-              ${Number(result.voterCount||vote.voterCount||0)}
-            </span>
+          <div class="print-summary-card">
+            <span>投票人數</span>
+            <strong>
+              ${Number(
+                result.voterCount||
+                vote.voterCount||
+                0
+              )}
+            </strong>
           </div>
         </section>
 
-        <section class="section">
-          <h2 class="section-title">投票結果</h2>
+        <section class="print-report-section">
+          <h2>投票結果</h2>
 
           <table>
             <thead>
@@ -1172,8 +1039,8 @@ function 建立列印HTML_(data){
           </table>
         </section>
 
-        <section class="section">
-          <h2 class="section-title">投票明細</h2>
+        <section class="print-report-section">
+          <h2>投票明細</h2>
 
           <table>
             <thead>
@@ -1188,7 +1055,7 @@ function 建立列印HTML_(data){
           </table>
         </section>
 
-        <footer class="print-footer">
+        <footer class="print-report-footer">
           本頁由心之所向線上投票系統產生
         </footer>
       </main>
@@ -1211,20 +1078,27 @@ function 顯示畫面_(id){
 }
 
 function 顯示錯誤_(message){
-  const errorMessage=document.getElementById('error-message');
+  const errorMessage=
+    document.getElementById('error-message');
 
   if(errorMessage)
-    errorMessage.textContent=message||'系統發生錯誤';
+    errorMessage.textContent=
+      message||'系統發生錯誤';
 
   顯示畫面_('error-view');
 }
 
 function 顯示訊息_(message,isError){
-  const element=document.getElementById('vote-message');
+  const element=
+    document.getElementById('vote-message');
+
   if(!element)return;
 
   element.textContent=message||'';
-  element.classList.toggle('error-text',Boolean(isError));
+  element.classList.toggle(
+    'error-text',
+    Boolean(isError)
+  );
 }
 
 function escapeHtml_(value){
