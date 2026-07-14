@@ -41,8 +41,12 @@ input {
 .app-header {
   margin-bottom: 20px;
   padding: 20px;
-  color: white;
-  background: linear-gradient(135deg, var(--primary), #28a5d6);
+  color: #ffffff;
+  background: linear-gradient(
+    135deg,
+    var(--primary),
+    #28a5d6
+  );
   border-radius: 14px;
 }
 
@@ -133,14 +137,14 @@ input {
 .badge {
   display: inline-block;
   padding: 4px 8px;
-  color: white;
+  color: #ffffff;
   background: var(--primary);
   border-radius: 999px;
   font-size: 12px;
 }
 
 .badge.closed {
-  background: #777;
+  background: #777777;
 }
 
 .vote-option {
@@ -150,6 +154,9 @@ input {
   border: 1px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .vote-option:hover {
@@ -165,7 +172,7 @@ input {
   padding: 9px 14px;
   border: 0;
   border-radius: 8px;
-  color: white;
+  color: #ffffff;
   background: var(--primary);
   cursor: pointer;
 }
@@ -231,9 +238,9 @@ input {
 
 .result-bar {
   height: 12px;
+  overflow: hidden;
   background: #d9eafa;
   border-radius: 999px;
-  overflow: hidden;
 }
 
 .result-bar span {
@@ -255,42 +262,7 @@ input {
   vertical-align: top;
 }
 
-@media (max-width: 600px) {
-  .container {
-    padding: 10px;
-  }
-
-  .result-label {
-    width: 120px;
-    flex-basis: 120px;
-  }
-
-  .details-table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-}
-
-@media print {
-  body {
-    background: white;
-  }
-
-  .app-header,
-  .action-row,
-  button,
-  #vote-list-view,
-  #vote-detail-view,
-  #result-view,
-  #details-view {
-    display: none !important;
-  }
-
-  #print-area {
-    display: block !important;
-  }
-}
+/* 已投票狀態 */
 
 .my-vote-status {
   margin: 16px 0;
@@ -314,4 +286,67 @@ input {
 
 .my-vote-status small {
   font-weight: 400;
+}
+
+/* Markdown 顯示 */
+
+.markdown-content {
+  line-height: 1.8;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+/* 手機版 */
+
+@media (max-width: 600px) {
+  .container {
+    padding: 10px;
+  }
+
+  .result-label {
+    width: 120px;
+    flex-basis: 120px;
+  }
+
+  .details-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .action-row .button {
+    width: 100%;
+  }
+}
+
+/* 列印版 */
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .app-header,
+  .action-row,
+  button,
+  #vote-list-view,
+  #vote-detail-view,
+  #result-view,
+  #details-view {
+    display: none !important;
+  }
+
+  #print-area {
+    display: block !important;
+  }
 }
