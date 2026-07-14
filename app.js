@@ -753,99 +753,445 @@ function 建立列印HTML_(data){
 
   const counts=Array.isArray(result.counts)?result.counts:[];
 
-  const detailsHtml=details.map(item=>{
-    const snapshots=Array.isArray(item.snapshots)
-      ?item.snapshots
-      :[];
+  const detailsHtml=details.length
+    ?details.map(item=>{
+      const snapshots=Array.isArray(item.snapshots)
+        ?item.snapshots
+        :[];
 
-    return`
+      return`
+        <tr>
+          <td>${escapeHtml_(item.displayName||item.userId||'')}</td>
+          <td>${snapshots.map(escapeHtml_).join('<br>')}</td>
+          <td>${escapeHtml_(item.createdAt||'')}</td>
+          <td>${escapeHtml_(item.updatedAt||'')}</td>
+        </tr>
+      `;
+    }).join('')
+    :`
       <tr>
-        <td>${escapeHtml_(item.displayName||item.userId||'')}</td>
-        <td>${snapshots.map(escapeHtml_).join('<br>')}</td>
-        <td>${escapeHtml_(item.createdAt||'')}</td>
-        <td>${escapeHtml_(item.updatedAt||'')}</td>
+        <td class="empty-cell" colspan="4">目前沒有投票明細</td>
       </tr>
     `;
-  }).join('');
 
-  const resultHtml=options.map((option,index)=>`
-    <tr>
-      <td>${index+1}. ${escapeHtml_(option)}</td>
-      <td>${Number(counts[index]||0)} 票</td>
-    </tr>
-  `).join('');
+  const resultHtml=options.length
+    ?options.map((option,index)=>`
+      <tr>
+        <td>
+          <span class="option-number">${index+1}</span>
+          ${escapeHtml_(option)}
+        </td>
+        <td class="vote-count">${Number(counts[index]||0)} 票</td>
+      </tr>
+    `).join('')
+    :`
+      <tr>
+        <td class="empty-cell" colspan="2">目前沒有投票結果</td>
+      </tr>
+    `;
+
+  const systemName=escapeHtml_(
+    data.systemName||'線上投票系統'
+  );
+
+  const voteId=escapeHtml_(vote.id||'');
+  const voteTitle=escapeHtml_(
+    vote.title||vote.name||vote.subject||''
+  );
 
   return`
     <!DOCTYPE html>
     <html lang="zh-Hant">
     <head>
       <meta charset="UTF-8">
-      <title>${escapeHtml_(vote.id||'投票結果')}</title>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>${voteId}｜${systemName}</title>
+
       <style>
-        body{
-          color:#202124;
-          background:#fff;
-          font-family:-apple-system,BlinkMacSystemFont,
-            "Segoe UI","Noto Sans TC",sans-serif;
-          line-height:1.7;
-          padding:24px;
+        :root{
+          color-scheme:light;
+          --primary:#334e68;
+          --primary-light:#eaf1f7;
+          --text:#263238;
+          --muted:#667085;
+          --border:#d9e1e8;
+          --line:#e7edf2;
+          --surface:#ffffff;
+          --background:#f5f7fa;
         }
-        h1,h2{line-height:1.4}
+
+        *{
+          box-sizing:border-box;
+        }
+
+        body{
+          margin:0;
+          color:var(--text);
+          background:var(--background);
+          font-family:
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            "Noto Sans TC",
+            "Microsoft JhengHei",
+            sans-serif;
+          line-height:1.7;
+        }
+
+        .page{
+          width:min(100% - 32px,1100px);
+          margin:32px auto;
+        }
+
+        .print-header{
+          position:relative;
+          overflow:hidden;
+          color:#fff;
+          background:
+            linear-gradient(135deg,#243b53,#486581);
+          border-radius:18px;
+          padding:32px 36px;
+          box-shadow:0 10px 28px rgba(36,59,83,.16);
+        }
+
+        .print-header::after{
+          content:"";
+          position:absolute;
+          width:220px;
+          height:220px;
+          right:-70px;
+          top:-100px;
+          border:32px solid rgba(255,255,255,.1);
+          border-radius:50%;
+        }
+
+        .system-name{
+          position:relative;
+          z-index:1;
+          margin:0 0 10px;
+          font-size:clamp(24px,4vw,36px);
+          font-weight:800;
+          letter-spacing:.04em;
+        }
+
+        .report-label{
+          position:relative;
+          z-index:1;
+          margin:0;
+          color:#d9e8f3;
+          font-size:14px;
+        }
+
+        .vote-heading{
+          margin:24px 0 16px;
+        }
+
+        .vote-id{
+          margin:0;
+          color:var(--primary);
+          font-size:clamp(24px,4vw,32px);
+          font-weight:800;
+          letter-spacing:.03em;
+        }
+
+        .vote-title{
+          margin:6px 0 0;
+          color:var(--muted);
+          font-size:16px;
+        }
+
+        .markdown-content{
+          margin:20px 0;
+          padding:20px 22px;
+          background:var(--surface);
+          border:1px solid var(--border);
+          border-left:5px solid var(--primary);
+          border-radius:12px;
+        }
+
+        .summary{
+          display:grid;
+          grid-template-columns:repeat(4,minmax(0,1fr));
+          gap:12px;
+          margin:20px 0 28px;
+        }
+
+        .summary-item{
+          min-height:86px;
+          padding:14px 16px;
+          background:var(--surface);
+          border:1px solid var(--border);
+          border-radius:12px;
+        }
+
+        .summary-label{
+          display:block;
+          margin-bottom:4px;
+          color:var(--muted);
+          font-size:13px;
+        }
+
+        .summary-value{
+          display:block;
+          color:var(--text);
+          font-size:16px;
+          font-weight:700;
+        }
+
+        .section{
+          margin-top:28px;
+          background:var(--surface);
+          border:1px solid var(--border);
+          border-radius:14px;
+          overflow:hidden;
+        }
+
+        .section-title{
+          display:flex;
+          align-items:center;
+          gap:10px;
+          margin:0;
+          padding:16px 20px;
+          color:var(--primary);
+          background:var(--primary-light);
+          font-size:20px;
+          font-weight:800;
+        }
+
+        .section-title::before{
+          content:"";
+          width:5px;
+          height:22px;
+          background:var(--primary);
+          border-radius:5px;
+        }
+
         table{
           width:100%;
-          margin:12px 0 24px;
           border-collapse:collapse;
+          font-size:14px;
         }
+
+        th{
+          color:#40566d;
+          background:#f1f5f8;
+          font-weight:800;
+          white-space:nowrap;
+        }
+
         th,td{
-          padding:8px;
-          border:1px solid #bfc7d1;
+          padding:13px 16px;
+          border-bottom:1px solid var(--line);
           text-align:left;
           vertical-align:top;
         }
-        th{background:#f3f6f9}
-        .meta{color:#4b5563}
-        .markdown-content{line-height:1.8}
+
+        tbody tr:last-child td{
+          border-bottom:0;
+        }
+
+        tbody tr:nth-child(even){
+          background:#fbfcfd;
+        }
+
+        tbody tr:hover{
+          background:#f2f7fb;
+        }
+
+        .option-number{
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          width:26px;
+          height:26px;
+          margin-right:8px;
+          color:#fff;
+          background:var(--primary);
+          border-radius:50%;
+          font-size:12px;
+          font-weight:800;
+        }
+
+        .vote-count{
+          color:var(--primary);
+          font-weight:800;
+          white-space:nowrap;
+        }
+
+        .empty-cell{
+          padding:24px;
+          color:var(--muted);
+          text-align:center;
+        }
+
+        .print-footer{
+          margin-top:24px;
+          color:var(--muted);
+          font-size:12px;
+          text-align:right;
+        }
+
+        @media(max-width:720px){
+          .page{
+            width:min(100% - 20px,1100px);
+            margin:16px auto;
+          }
+
+          .print-header{
+            padding:24px;
+            border-radius:14px;
+          }
+
+          .summary{
+            grid-template-columns:repeat(2,minmax(0,1fr));
+          }
+
+          .section{
+            overflow-x:auto;
+          }
+
+          table{
+            min-width:620px;
+          }
+        }
+
         @media print{
-          body{padding:0}
-          tr,h2{break-inside:avoid}
+          @page{
+            size:A4;
+            margin:14mm;
+          }
+
+          body{
+            background:#fff;
+          }
+
+          .page{
+            width:100%;
+            margin:0;
+          }
+
+          .print-header{
+            color:#000;
+            background:#fff;
+            border:2px solid var(--primary);
+            box-shadow:none;
+          }
+
+          .print-header::after{
+            display:none;
+          }
+
+          .report-label{
+            color:var(--muted);
+          }
+
+          .section{
+            break-inside:avoid;
+            box-shadow:none;
+          }
+
+          .section-title{
+            break-after:avoid;
+          }
+
+          thead{
+            display:table-header-group;
+          }
+
+          tr{
+            break-inside:avoid;
+          }
+
+          .print-footer{
+            display:block;
+          }
         }
       </style>
     </head>
+
     <body>
-      <h1>${escapeHtml_(data.systemName||'線上投票系統')}</h1>
-      <h2>${escapeHtml_(vote.id||'')}</h2>
+      <main class="page">
+        <header class="print-header">
+          <h1 class="system-name">${systemName}</h1>
+          <p class="report-label">投票結果與明細報告</p>
+        </header>
 
-      <div class="markdown-content">${vote.markdownHtml||''}</div>
+        <section class="vote-heading">
+          <h2 class="vote-id">${voteId}</h2>
+          ${voteTitle
+            ?`<p class="vote-title">${voteTitle}</p>`
+            :''
+          }
+        </section>
 
-      <div class="meta">
-        <p>投票狀態：${escapeHtml_(vote.status||'')}</p>
-        <p>投票方式：${vote.multiSelect?'複選':'單選'}</p>
-        <p>截止日期：${escapeHtml_(vote.deadline||'無')}</p>
-        <p>投票人數：${Number(
-          result.voterCount||vote.voterCount||0
-        )}</p>
-      </div>
+        <div class="markdown-content">
+          ${vote.markdownHtml||''}
+        </div>
 
-      <h2>投票結果</h2>
-      <table>
-        <thead>
-          <tr><th>選項</th><th>票數</th></tr>
-        </thead>
-        <tbody>${resultHtml}</tbody>
-      </table>
+        <section class="summary">
+          <div class="summary-item">
+            <span class="summary-label">投票狀態</span>
+            <span class="summary-value">
+              ${escapeHtml_(vote.status||'')}
+            </span>
+          </div>
 
-      <h2>投票明細</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>投票者</th>
-            <th>選擇內容</th>
-            <th>首次投票時間</th>
-            <th>最後修改時間</th>
-          </tr>
-        </thead>
-        <tbody>${detailsHtml}</tbody>
-      </table>
+          <div class="summary-item">
+            <span class="summary-label">投票方式</span>
+            <span class="summary-value">
+              ${vote.multiSelect?'複選':'單選'}
+            </span>
+          </div>
+
+          <div class="summary-item">
+            <span class="summary-label">截止日期</span>
+            <span class="summary-value">
+              ${escapeHtml_(vote.deadline||'無')}
+            </span>
+          </div>
+
+          <div class="summary-item">
+            <span class="summary-label">投票人數</span>
+            <span class="summary-value">
+              ${Number(result.voterCount||vote.voterCount||0)}
+            </span>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">投票結果</h2>
+
+          <table>
+            <thead>
+              <tr>
+                <th>選項</th>
+                <th>票數</th>
+              </tr>
+            </thead>
+            <tbody>${resultHtml}</tbody>
+          </table>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">投票明細</h2>
+
+          <table>
+            <thead>
+              <tr>
+                <th>投票者</th>
+                <th>選擇內容</th>
+                <th>首次投票時間</th>
+                <th>最後修改時間</th>
+              </tr>
+            </thead>
+            <tbody>${detailsHtml}</tbody>
+          </table>
+        </section>
+
+        <footer class="print-footer">
+          本頁由心之所向線上投票系統產生
+        </footer>
+      </main>
     </body>
     </html>
   `;
