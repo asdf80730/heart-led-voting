@@ -556,9 +556,6 @@ async function 送出投票_() {
   const submitButton =
     document.getElementById('submit-vote-button');
 
-  const addOptionButton =
-    document.getElementById('add-option-button');
-
   if (
     submitButton &&
     submitButton.disabled
@@ -582,16 +579,14 @@ async function 送出投票_() {
     return input.dataset.snapshot || '';
   });
 
-  const originalText = submitButton
-    ? submitButton.textContent
-    : '送出投票';
-
   try {
     設定投票操作中_(true);
 
-    顯示訊息_(
-      '正在送出投票，請稍候……'
-    );
+    if (submitButton) {
+      submitButton.textContent = '送出中……';
+    }
+
+    顯示訊息_('正在送出投票，請稍候……');
 
     const data = await apiRequest_(
       'submitVote',
@@ -608,6 +603,7 @@ async function 送出投票_() {
       );
     }
 
+    // 直接使用 submitVote 回傳資料，不再重新呼叫 getVote
     state.currentVote = data.vote;
 
     renderVoteDetail_(
@@ -615,7 +611,7 @@ async function 送出投票_() {
     );
 
     顯示訊息_(
-      data.message || '投票已成功送出'
+      data.message || '投票成功'
     );
 
     frontLog_('vote.submit.completed', {
@@ -634,19 +630,6 @@ async function 送出投票_() {
     );
   } finally {
     設定投票操作中_(false);
-
-    if (submitButton) {
-      submitButton.textContent = originalText;
-    }
-
-    if (addOptionButton) {
-      addOptionButton.disabled =
-        state.currentVote
-          ? Boolean(
-            state.currentVote.canAddOption === false
-          )
-          : false;
-    }
   }
 }
 
@@ -746,7 +729,10 @@ async function 新增選項_() {
   const input =
     document.getElementById('new-option-input');
 
-  if (!input) {
+  const saveButton =
+    document.getElementById('save-option-button');
+
+  if (!input || !saveButton) {
     return;
   }
 
@@ -757,34 +743,54 @@ async function 新增選項_() {
     return;
   }
 
+  if (saveButton.disabled) {
+    return;
+  }
+
+  const voteId = state.currentVote.id;
   const preservedIndexes =
     取得目前勾選行號_();
 
-  const saveButton =
-    document.getElementById('save-option-button');
-
-  if (saveButton) {
-    saveButton.disabled = true;
-  }
-
   try {
+    設定投票操作中_(true);
+
+    saveButton.disabled = true;
+    saveButton.textContent = '新增中……';
+
+    顯示訊息_('正在新增選項，請稍候……');
+
     const data = await apiRequest_(
       'addOption',
       {
-        voteId: state.currentVote.id,
+        voteId: voteId,
         optionText: optionText
       }
     );
 
-    frontLog_('option.add.completed', {
-      voteId: state.currentVote.id,
-      optionCount: Array.isArray(data.options)
-        ? data.options.length
-        : 0
-    });
+    if (
+      !data ||
+      !Array.isArray(data.options)
+    ) {
+      throw new Error(
+        '後端未回傳更新後的選項'
+      );
+    }
 
-    await 重新載入目前投票_(
-      state.currentVote.id
+    // 不再呼叫重新載入目前投票
+    const oldCounts =
+      Array.isArray(state.currentVote.counts)
+        ? state.currentVote.counts
+        : [];
+
+    state.currentVote = Object.assign(
+      {},
+      state.currentVote,
+      {
+        options: data.options,
+        counts: data.options.map(function (_, index) {
+          return oldCounts[index] || 0;
+        })
+      }
     );
 
     renderVoteDetail_(
@@ -792,18 +798,29 @@ async function 新增選項_() {
       preservedIndexes
     );
 
-    顯示訊息_('新增選項成功');
-  } catch (error) {
-    if (saveButton) {
-      saveButton.disabled = false;
-    }
+    input.value = '';
 
+    顯示訊息_('新增選項成功');
+
+    frontLog_('option.add.completed', {
+      voteId: voteId,
+      optionCount: data.options.length
+    });
+  } catch (error) {
     frontLog_('option.add.failed', {
-      voteId: state.currentVote.id,
+      voteId: voteId,
       message: error.message
     });
 
-    顯示訊息_(error.message, true);
+    顯示訊息_(
+      error.message || '新增選項失敗',
+      true
+    );
+  } finally {
+    設定投票操作中_(false);
+
+    saveButton.disabled = false;
+    saveButton.textContent = '新增選項';
   }
 }
 
