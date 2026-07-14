@@ -291,3 +291,27 @@ input {
     display: block !important;
   }
 }
+
+.my-vote-status {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.my-vote-status.voted {
+  color: #075e38;
+  background: #e7f7ee;
+  border: 1px solid #8bd5ad;
+}
+
+.my-vote-status.not-voted {
+  color: #7a4b00;
+  background: #fff7df;
+  border: 1px solid #e8c66d;
+}
+
+.my-vote-status small {
+  font-weight: 400;
+}
