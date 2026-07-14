@@ -1,4 +1,3 @@
-
 'use strict';
 
 const state = {
@@ -28,6 +27,7 @@ function 綁定事件_() {
   });
 
   綁定事件元素_('refresh-button', 'click', 載入投票列表_);
+
   綁定事件元素_('back-list-button', 'click', function () {
     顯示畫面_('vote-list-view');
   });
@@ -100,7 +100,10 @@ async function 初始化LIFF_() {
 
     frontLog_('bootstrap.start', {});
 
-    const response = await apiRequest_('bootstrap', {});
+    const response = await apiRequest_(
+      'bootstrap',
+      {}
+    );
 
     state.session = response;
     state.votes = response.votes || [];
@@ -133,7 +136,8 @@ async function 初始化LIFF_() {
 
       if (unauthorizedElement && response.user) {
         unauthorizedElement.textContent =
-          'LINE User ID：' + response.user.userId;
+          'LINE User ID：' +
+          response.user.userId;
       }
 
       顯示畫面_(
@@ -159,7 +163,9 @@ async function 初始化LIFF_() {
       message: error.message
     });
 
-    顯示錯誤_(error.message || '初始化失敗');
+    顯示錯誤_(
+      error.message || '初始化失敗'
+    );
   }
 }
 
@@ -167,8 +173,10 @@ async function 初始化LIFF_() {
 /* =========================================================
  * API 呼叫
  *
- * 使用 URLSearchParams，避免 application/json
- * 觸發 CORS 預檢請求。
+ * 重要：
+ * 1. 不設定 headers
+ * 2. 不使用 application/json
+ * 3. 使用純文字表單格式，避免 CORS 預檢請求
  * ========================================================= */
 
 async function apiRequest_(action, payload) {
@@ -182,6 +190,10 @@ async function apiRequest_(action, payload) {
     payload: payload || {}
   };
 
+  const requestBody =
+    'payload=' +
+    encodeURIComponent(JSON.stringify(body));
+
   frontLog_('api.request.start', {
     requestId: requestId,
     action: action
@@ -192,9 +204,9 @@ async function apiRequest_(action, payload) {
       APP_CONFIG.GAS_API_URL,
       {
         method: 'POST',
-        body: new URLSearchParams({
-          payload: JSON.stringify(body)
-        })
+        body: requestBody,
+        redirect: 'follow',
+        cache: 'no-store'
       }
     );
 
@@ -228,7 +240,8 @@ async function apiRequest_(action, payload) {
 
     if (!response.ok) {
       throw new Error(
-        'API HTTP 錯誤：' + response.status
+        'API HTTP 錯誤：' +
+        response.status
       );
     }
 
@@ -262,7 +275,8 @@ async function apiRequest_(action, payload) {
 function 建立RequestId_() {
   if (
     window.crypto &&
-    typeof window.crypto.randomUUID === 'function'
+    typeof window.crypto.randomUUID ===
+      'function'
   ) {
     return window.crypto.randomUUID();
   }
@@ -270,7 +284,9 @@ function 建立RequestId_() {
   return (
     Date.now().toString(36) +
     '-' +
-    Math.random().toString(36).slice(2)
+    Math.random()
+      .toString(36)
+      .slice(2)
   );
 }
 
@@ -298,7 +314,10 @@ async function 載入投票列表_() {
   try {
     顯示畫面_('loading-view');
 
-    const data = await apiRequest_('getVotes', {});
+    const data = await apiRequest_(
+      'getVotes',
+      {}
+    );
 
     state.votes = data.votes || [];
 
@@ -322,46 +341,67 @@ function renderVoteList_(votes) {
   const container =
     document.getElementById('vote-list');
 
-  if (!container) return;
+  if (!container) {
+    return;
+  }
 
   container.innerHTML = '';
 
   if (!votes.length) {
     container.innerHTML =
-      '<div class="message">目前沒有啟用中的投票。</div>';
+      '<div class="message">' +
+      '目前沒有啟用中的投票。' +
+      '</div>';
 
     return;
   }
 
   votes.forEach(function (vote) {
-    const item = document.createElement('article');
+    const item =
+      document.createElement('article');
+
     item.className = 'vote-item';
 
-    const title = document.createElement('h3');
-    title.innerHTML =
-      vote.markdownHtml || escapeHtml_(vote.id);
+    const title =
+      document.createElement('h3');
 
-    const meta = document.createElement('p');
+    title.innerHTML =
+      vote.markdownHtml ||
+      escapeHtml_(vote.id);
+
+    const meta =
+      document.createElement('p');
+
     meta.textContent =
       vote.id +
       '｜' +
       (
-        vote.multiSelect ? '複選' : '單選'
+        vote.multiSelect
+          ? '複選'
+          : '單選'
       ) +
       '｜截止日期：' +
-      (vote.deadline || '無');
+      (
+        vote.deadline || '無'
+      );
 
-    const button = document.createElement('button');
+    const button =
+      document.createElement('button');
+
     button.className = 'button';
     button.textContent = '查看投票';
 
-    button.addEventListener('click', function () {
-      載入單筆投票_(vote.id);
-    });
+    button.addEventListener(
+      'click',
+      function () {
+        載入單筆投票_(vote.id);
+      }
+    );
 
     item.appendChild(title);
     item.appendChild(meta);
     item.appendChild(button);
+
     container.appendChild(item);
   });
 }
@@ -396,35 +436,39 @@ function renderVoteDetail_(vote) {
   const detail =
     document.getElementById('vote-detail');
 
-  if (!detail) return;
+  if (!detail) {
+    return;
+  }
 
-  const myRecord = vote.myRecord || {
-    hasVoted: false,
-    selectedIndexes: [],
-    snapshots: [],
-    createdAt: '',
-    updatedAt: ''
-  };
+  const myRecord =
+    vote.myRecord || {
+      hasVoted: false,
+      selectedIndexes: [],
+      snapshots: [],
+      createdAt: '',
+      updatedAt: ''
+    };
 
-  const voteStatusHtml = myRecord.hasVoted
-    ? `
-      <div class="my-vote-status voted">
-        ✅ 你已經投過票
-        <br>
-        <small>
-          首次投票：
-          ${escapeHtml_(myRecord.createdAt)}
+  const voteStatusHtml =
+    myRecord.hasVoted
+      ? `
+        <div class="my-vote-status voted">
+          ✅ 你已經投過票
           <br>
-          最後修改：
-          ${escapeHtml_(myRecord.updatedAt)}
-        </small>
-      </div>
-    `
-    : `
-      <div class="my-vote-status not-voted">
-        ⭕ 你尚未投票
-      </div>
-    `;
+          <small>
+            首次投票：
+            ${escapeHtml_(myRecord.createdAt)}
+            <br>
+            最後修改：
+            ${escapeHtml_(myRecord.updatedAt)}
+          </small>
+        </div>
+      `
+      : `
+        <div class="my-vote-status not-voted">
+          ⭕ 你尚未投票
+        </div>
+      `;
 
   detail.innerHTML = `
     <h2>${escapeHtml_(vote.id)}</h2>
@@ -456,11 +500,14 @@ function renderVoteDetail_(vote) {
   const formArea =
     document.getElementById('vote-form-area');
 
-  if (!formArea) return;
+  if (!formArea) {
+    return;
+  }
 
   formArea.innerHTML = '';
 
-  const form = document.createElement('div');
+  const form =
+    document.createElement('div');
 
   (vote.options || []).forEach(function (
     option,
@@ -468,26 +515,33 @@ function renderVoteDetail_(vote) {
   ) {
     const optionNumber = index + 1;
 
-    const label = document.createElement('label');
+    const label =
+      document.createElement('label');
+
     label.className = 'vote-option';
 
-    const input = document.createElement('input');
+    const input =
+      document.createElement('input');
 
-    input.type = vote.multiSelect
-      ? 'checkbox'
-      : 'radio';
+    input.type =
+      vote.multiSelect
+        ? 'checkbox'
+        : 'radio';
 
     input.name = 'vote-option';
     input.value = String(optionNumber);
     input.dataset.snapshot = option;
 
     input.checked =
-      (myRecord.selectedIndexes || [])
-        .indexOf(optionNumber) !== -1;
+      (
+        myRecord.selectedIndexes || []
+      ).indexOf(optionNumber) !== -1;
 
-    input.disabled = Boolean(vote.closed);
+    input.disabled =
+      Boolean(vote.closed);
 
     label.appendChild(input);
+
     label.appendChild(
       document.createTextNode(option)
     );
@@ -498,10 +552,14 @@ function renderVoteDetail_(vote) {
   formArea.appendChild(form);
 
   const submitButton =
-    document.getElementById('submit-vote-button');
+    document.getElementById(
+      'submit-vote-button'
+    );
 
   if (submitButton) {
-    submitButton.disabled = Boolean(vote.closed);
+    submitButton.disabled =
+      Boolean(vote.closed);
+
     submitButton.textContent =
       myRecord.hasVoted
         ? '修改投票'
@@ -509,14 +567,19 @@ function renderVoteDetail_(vote) {
   }
 
   const addOptionButton =
-    document.getElementById('add-option-button');
+    document.getElementById(
+      'add-option-button'
+    );
 
   if (addOptionButton) {
-    addOptionButton.disabled = Boolean(vote.closed);
+    addOptionButton.disabled =
+      Boolean(vote.closed);
   }
 
   const voteMessage =
-    document.getElementById('vote-message');
+    document.getElementById(
+      'vote-message'
+    );
 
   if (voteMessage) {
     voteMessage.textContent = '';
@@ -529,15 +592,20 @@ function renderVoteDetail_(vote) {
  * ========================================================= */
 
 async function 送出投票_() {
-  if (!state.currentVote) return;
+  if (!state.currentVote) {
+    return;
+  }
 
-  const voteId = state.currentVote.id;
+  const voteId =
+    state.currentVote.id;
+
   const myRecord =
     state.currentVote.myRecord || {};
 
-  const operation = myRecord.hasVoted
-    ? 'update'
-    : 'create';
+  const operation =
+    myRecord.hasVoted
+      ? 'update'
+      : 'create';
 
   frontLog_('vote.submit.start', {
     voteId: voteId,
@@ -545,24 +613,23 @@ async function 送出投票_() {
   });
 
   try {
-    const inputs = Array.from(
-      document.querySelectorAll(
-        '#vote-form-area ' +
-        'input[name="vote-option"]:checked'
-      )
-    );
+    const inputs =
+      Array.from(
+        document.querySelectorAll(
+          '#vote-form-area ' +
+          'input[name="vote-option"]:checked'
+        )
+      );
 
-    const selectedIndexes = inputs.map(function (
-      input
-    ) {
-      return Number(input.value);
-    });
+    const selectedIndexes =
+      inputs.map(function (input) {
+        return Number(input.value);
+      });
 
-    const snapshots = inputs.map(function (
-      input
-    ) {
-      return input.dataset.snapshot;
-    });
+    const snapshots =
+      inputs.map(function (input) {
+        return input.dataset.snapshot;
+      });
 
     if (!selectedIndexes.length) {
       throw new Error('請至少選擇一個選項');
@@ -614,7 +681,9 @@ function 顯示新增選項_() {
     return;
   }
 
-  const box = document.createElement('div');
+  const box =
+    document.createElement('div');
+
   box.id = 'new-option-box';
   box.className = 'add-option-box';
 
@@ -635,27 +704,43 @@ function 顯示新增選項_() {
   `;
 
   const formArea =
-    document.getElementById('vote-form-area');
+    document.getElementById(
+      'vote-form-area'
+    );
 
-  if (!formArea) return;
+  if (!formArea) {
+    return;
+  }
 
   formArea.appendChild(box);
 
   document
     .getElementById('save-option-button')
-    .addEventListener('click', 新增選項_);
+    .addEventListener(
+      'click',
+      新增選項_
+    );
 }
 
 async function 新增選項_() {
   const input =
-    document.getElementById('new-option-input');
+    document.getElementById(
+      'new-option-input'
+    );
 
-  if (!input || !state.currentVote) return;
+  if (!input || !state.currentVote) {
+    return;
+  }
 
-  const optionText = input.value.trim();
+  const optionText =
+    input.value.trim();
 
   if (!optionText) {
-    顯示訊息_('請輸入選項內容', true);
+    顯示訊息_(
+      '請輸入選項內容',
+      true
+    );
+
     return;
   }
 
@@ -668,16 +753,30 @@ async function 新增選項_() {
       }
     );
 
-    state.currentVote.options = data.options;
+    state.currentVote.options =
+      data.options;
 
-    delete state.resultCache[state.currentVote.id];
-    delete state.detailsCache[state.currentVote.id];
+    delete state.resultCache[
+      state.currentVote.id
+    ];
 
-    renderVoteDetail_(state.currentVote);
-    顯示訊息_('新增選項成功');
+    delete state.detailsCache[
+      state.currentVote.id
+    ];
+
+    renderVoteDetail_(
+      state.currentVote
+    );
+
+    顯示訊息_(
+      '新增選項成功'
+    );
 
   } catch (error) {
-    顯示訊息_(error.message, true);
+    顯示訊息_(
+      error.message,
+      true
+    );
   }
 }
 
@@ -687,9 +786,12 @@ async function 新增選項_() {
  * ========================================================= */
 
 async function 載入結果_() {
-  if (!state.currentVote) return;
+  if (!state.currentVote) {
+    return;
+  }
 
-  const voteId = state.currentVote.id;
+  const voteId =
+    state.currentVote.id;
 
   if (state.resultCache[voteId]) {
     frontLog_('result.cache.hit', {
@@ -699,7 +801,10 @@ async function 載入結果_() {
     state.currentResult =
       state.resultCache[voteId];
 
-    renderResult_(state.currentResult);
+    renderResult_(
+      state.currentResult
+    );
+
     顯示畫面_('result-view');
 
     return;
@@ -724,23 +829,34 @@ async function 載入結果_() {
     顯示畫面_('result-view');
 
   } catch (error) {
-    顯示訊息_(error.message, true);
+    顯示訊息_(
+      error.message,
+      true
+    );
   }
 }
 
 function renderResult_(result) {
   const container =
-    document.getElementById('result-content');
+    document.getElementById(
+      'result-content'
+    );
 
-  if (!container) return;
+  if (!container) {
+    return;
+  }
 
-  const counts = result.counts || [];
-  const options = result.options || [];
+  const counts =
+    result.counts || [];
 
-  const max = Math.max.apply(
-    null,
-    counts.concat([1])
-  );
+  const options =
+    result.options || [];
+
+  const max =
+    Math.max.apply(
+      null,
+      counts.concat([1])
+    );
 
   let html = `
     <h2>
@@ -759,11 +875,11 @@ function renderResult_(result) {
   `;
 
   options.forEach(function (option, index) {
-    const count = counts[index] || 0;
+    const count =
+      counts[index] || 0;
 
-    const width = Math.round(
-      (count / max) * 100
-    );
+    const width =
+      Math.round((count / max) * 100);
 
     html += `
       <div class="result-row">
@@ -792,9 +908,12 @@ function renderResult_(result) {
  * ========================================================= */
 
 async function 載入明細_() {
-  if (!state.currentVote) return;
+  if (!state.currentVote) {
+    return;
+  }
 
-  const voteId = state.currentVote.id;
+  const voteId =
+    state.currentVote.id;
 
   if (state.detailsCache[voteId]) {
     frontLog_('details.cache.hit', {
@@ -804,7 +923,10 @@ async function 載入明細_() {
     state.currentDetails =
       state.detailsCache[voteId];
 
-    renderDetails_(state.currentDetails);
+    renderDetails_(
+      state.currentDetails
+    );
+
     顯示畫面_('details-view');
 
     return;
@@ -829,15 +951,22 @@ async function 載入明細_() {
     顯示畫面_('details-view');
 
   } catch (error) {
-    顯示訊息_(error.message, true);
+    顯示訊息_(
+      error.message,
+      true
+    );
   }
 }
 
 function renderDetails_(data) {
   const container =
-    document.getElementById('details-content');
+    document.getElementById(
+      'details-content'
+    );
 
-  if (!container) return;
+  if (!container) {
+    return;
+  }
 
   let html = `
     <h2>
@@ -859,11 +988,10 @@ function renderDetails_(data) {
   `;
 
   (data.details || []).forEach(function (item) {
-    const snapshots = Array.isArray(
-      item.snapshots
-    )
-      ? item.snapshots
-      : [];
+    const snapshots =
+      Array.isArray(item.snapshots)
+        ? item.snapshots
+        : [];
 
     html += `
       <tr>
@@ -872,7 +1000,9 @@ function renderDetails_(data) {
         </td>
 
         <td>
-          ${snapshots.map(escapeHtml_).join('<br>')}
+          ${snapshots
+            .map(escapeHtml_)
+            .join('<br>')}
         </td>
 
         <td>
@@ -900,7 +1030,9 @@ function renderDetails_(data) {
  * ========================================================= */
 
 async function 列印投票_() {
-  if (!state.currentVote) return;
+  if (!state.currentVote) {
+    return;
+  }
 
   try {
     const data = await apiRequest_(
@@ -919,51 +1051,73 @@ async function 列印投票_() {
       );
     }
 
-    const result = data.result || {};
-    const details = data.details || [];
-    const options = result.options || [];
-    const counts = result.counts || [];
+    const result =
+      data.result || {};
 
-    const resultRows = options.map(function (
-      option,
-      index
-    ) {
-      return `
-        <tr>
-          <td>
-            ${index + 1}.
-            ${escapeHtml_(option)}
-          </td>
-          <td>${counts[index] || 0}</td>
-        </tr>
-      `;
-    }).join('');
+    const details =
+      data.details || [];
 
-    const detailRows = details.map(function (
-      item
-    ) {
-      const snapshots = Array.isArray(
-        item.snapshots
-      )
-        ? item.snapshots
-        : [];
+    const options =
+      result.options || [];
 
-      return `
-        <tr>
-          <td>${escapeHtml_(item.displayName)}</td>
-          <td>${snapshots.map(escapeHtml_).join('<br>')}</td>
-          <td>${escapeHtml_(item.createdAt)}</td>
-          <td>${escapeHtml_(item.updatedAt)}</td>
-        </tr>
-      `;
-    }).join('');
+    const counts =
+      result.counts || [];
+
+    const resultRows =
+      options.map(function (option, index) {
+        return `
+          <tr>
+            <td>
+              ${index + 1}.
+              ${escapeHtml_(option)}
+            </td>
+
+            <td>
+              ${counts[index] || 0}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+    const detailRows =
+      details.map(function (item) {
+        const snapshots =
+          Array.isArray(item.snapshots)
+            ? item.snapshots
+            : [];
+
+        return `
+          <tr>
+            <td>
+              ${escapeHtml_(item.displayName)}
+            </td>
+
+            <td>
+              ${snapshots
+                .map(escapeHtml_)
+                .join('<br>')}
+            </td>
+
+            <td>
+              ${escapeHtml_(item.createdAt)}
+            </td>
+
+            <td>
+              ${escapeHtml_(item.updatedAt)}
+            </td>
+          </tr>
+        `;
+      }).join('');
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html lang="zh-Hant">
       <head>
         <meta charset="UTF-8">
-        <title>${escapeHtml_(data.vote.id)}</title>
+
+        <title>
+          ${escapeHtml_(data.vote.id)}
+        </title>
 
         <style>
           body {
@@ -987,9 +1141,13 @@ async function 列印投票_() {
       </head>
 
       <body>
-        <h1>${escapeHtml_(data.systemName)}</h1>
+        <h1>
+          ${escapeHtml_(data.systemName)}
+        </h1>
 
-        <h2>${escapeHtml_(data.vote.id)}</h2>
+        <h2>
+          ${escapeHtml_(data.vote.id)}
+        </h2>
 
         <div>
           ${data.vote.markdownHtml || ''}
@@ -1045,7 +1203,10 @@ async function 列印投票_() {
     printWindow.print();
 
   } catch (error) {
-    顯示訊息_(error.message, true);
+    顯示訊息_(
+      error.message,
+      true
+    );
   }
 }
 
@@ -1061,7 +1222,8 @@ function 顯示畫面_(id) {
       view.classList.add('hidden');
     });
 
-  const target = document.getElementById(id);
+  const target =
+    document.getElementById(id);
 
   if (!target) {
     throw new Error(
@@ -1074,7 +1236,9 @@ function 顯示畫面_(id) {
 
 function 顯示錯誤_(message) {
   const errorMessage =
-    document.getElementById('error-message');
+    document.getElementById(
+      'error-message'
+    );
 
   if (errorMessage) {
     errorMessage.textContent =
@@ -1086,11 +1250,16 @@ function 顯示錯誤_(message) {
 
 function 顯示訊息_(message, isError) {
   const element =
-    document.getElementById('vote-message');
+    document.getElementById(
+      'vote-message'
+    );
 
-  if (!element) return;
+  if (!element) {
+    return;
+  }
 
-  element.textContent = message || '';
+  element.textContent =
+    message || '';
 
   element.classList.toggle(
     'error-text',
