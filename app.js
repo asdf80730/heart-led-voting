@@ -112,87 +112,115 @@ function 綁定事件_() {
  * LIFF  
  * ========================================================= */  
 
-async function 初始化LIFF_() {  
-  try {  
-    顯示畫面_('loading-view');  
+async function 初始化LIFF_() {
+  try {
+    顯示畫面_('loading-view');
 
-    if (  
-      !window.APP_CONFIG ||  
-      !APP_CONFIG.LIFF_ID  
-    ) {  
-      throw new Error(  
-        '尚未設定 LIFF_ID'  
-      );  
-    }  
+    if (
+      !window.APP_CONFIG ||
+      !APP_CONFIG.LIFF_ID
+    ) {
+      throw new Error(
+        '尚未設定 LIFF_ID'
+      );
+    }
 
-    if (!APP_CONFIG.GAS_API_URL) {  
-      throw new Error(  
-        '尚未設定 GAS_API_URL'  
-      );  
-    }  
+    if (!APP_CONFIG.GAS_API_URL) {
+      throw new Error(
+        '尚未設定 GAS_API_URL'
+      );
+    }
 
-    await liff.init({  
-      liffId: APP_CONFIG.LIFF_ID  
-    });  
+    await liff.init({
+      liffId: APP_CONFIG.LIFF_ID
+    });
 
-    if (!liff.isLoggedIn()) {  
-      liff.login();  
-      return;  
-    }  
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
 
-    state.idToken = liff.getIDToken();  
+    state.idToken = liff.getIDToken();
 
-    if (!state.idToken) {  
-      throw new Error(  
-        '無法取得 LINE ID Token'  
-      );  
-    }  
+    if (!state.idToken) {
+      throw new Error(
+        '無法取得 LINE ID Token'
+      );
+    }
 
-    const response = await apiRequest_(  
-      'getSession',  
-      {}  
-    );  
+    frontLog_(
+      'bootstrap.start',
+      {}
+    );
 
-    state.session = response;  
+    const response = await apiRequest_(
+      'bootstrap',
+      {}
+    );
 
-    document.getElementById(  
-      'system-name'  
-    ).textContent = '線上投票系統';  
+    state.session = response;
+    state.votes = response.votes || [];
 
-    document.getElementById(  
-      'user-info'  
-    ).textContent =  
-      '使用者：' +  
-      (  
-        response.user.displayName ||  
-        response.user.userId  
-      ) +  
-      '｜狀態：' +  
-      response.user.status;  
+    document.getElementById(
+      'system-name'
+    ).textContent =
+      response.systemName ||
+      '線上投票系統';
 
-    if (!response.user.authorized) {  
-      document.getElementById(  
-        'unauthorized-user-id'  
-      ).textContent =  
-        'LINE User ID：' +  
-        response.user.userId;  
+    document.getElementById(
+      'user-info'
+    ).textContent =
+      '使用者：' +
+      (
+        response.user.displayName ||
+        response.user.userId
+      ) +
+      '｜狀態：' +
+      response.user.status;
 
-      顯示畫面_(  
-        response.user.status === '停用'  
-          ? 'disabled-view'  
-          : 'unauthorized-view'  
-      );  
+    if (!response.user.authorized) {
+      document.getElementById(
+        'unauthorized-user-id'
+      ).textContent =
+        'LINE User ID：' +
+        response.user.userId;
 
-      return;  
-    }  
+      顯示畫面_(
+        response.user.status === '停用'
+          ? 'disabled-view'
+          : 'unauthorized-view'
+      );
 
-    await 載入投票列表_();  
-  } catch (error) {  
-    顯示錯誤_(  
-      error.message || '初始化失敗'  
-    );  
-  }  
-}  
+      return;
+    }
+
+    renderVoteList_(
+      state.votes
+    );
+
+    frontLog_(
+      'bootstrap.completed',
+      {
+        voteCount: state.votes.length
+      }
+    );
+
+    顯示畫面_(
+      'vote-list-view'
+    );
+  } catch (error) {
+    frontLog_(
+      'bootstrap.failed',
+      {
+        message: error.message
+      }
+    );
+
+    顯示錯誤_(
+      error.message || '初始化失敗'
+    );
+  }
+} 
 
 
 /* =========================================================  
@@ -216,16 +244,23 @@ async function apiRequest_(
     payload: payload || {}  
   };  
 
-  frontLog_(  
-    'api.request.start',  
-    {  
-      requestId: requestId,  
-      action: action,  
-      voteId: payload && payload.voteId  
-        ? payload.voteId  
-        : ''  
-    }  
-  );  
+function frontLog_(
+  event,
+  data
+) {
+  const record = {
+    source: 'frontend',
+    event: event,
+    time: new Date().toISOString(),
+    data: data || {}
+  };
+
+  console.info(
+    '[投票系統]',
+    event,
+    JSON.stringify(record.data)
+  );
+}
 
   try {  
     const response = await fetch(  
