@@ -549,3 +549,261 @@ button {
     white-space: normal;
   }
 }
+/* =========================================================
+ * 新版列印報告
+ * 列印頁透過 link 載入本檔案，不再把 CSS 寫在 app.js。
+ * ========================================================= */
+
+#print-report-v2 {
+  width: min(1080px, calc(100% - 32px));
+  margin: 30px auto;
+}
+
+.print-report-header {
+  position: relative;
+  overflow: hidden;
+  padding: 32px 38px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #203a54, #3d668a);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgb(32 58 84 / 18%);
+}
+
+.print-report-header::after {
+  content: "";
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  top: -110px;
+  right: -78px;
+  border: 30px solid rgb(255 255 255 / 12%);
+  border-radius: 50%;
+}
+
+.print-report-header h1,
+.print-report-header p {
+  position: relative;
+  z-index: 1;
+}
+
+.print-report-header h1 {
+  margin: 0;
+  font-size: 36px;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+}
+
+.print-report-header p {
+  margin: 10px 0 0;
+  color: #dceaf3;
+  font-size: 14px;
+}
+
+.print-vote-heading {
+  margin: 25px 0 16px;
+}
+
+.print-vote-heading h2 {
+  margin: 0;
+  color: #203a54;
+  font-size: 30px;
+  line-height: 1.3;
+}
+
+.print-vote-heading p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.print-description {
+  margin: 20px 0;
+  padding: 18px 22px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 5px solid #3d668a;
+  border-radius: 12px;
+  line-height: 1.8;
+}
+
+.print-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 20px 0 28px;
+}
+
+.print-summary-card {
+  padding: 15px 17px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.print-summary-card span,
+.print-summary-card strong {
+  display: block;
+}
+
+.print-summary-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.print-summary-card strong {
+  margin-top: 3px;
+  color: #273746;
+  font-size: 16px;
+}
+
+.print-report-section {
+  margin-top: 25px;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgb(32 58 84 / 6%);
+}
+
+.print-report-section h2 {
+  margin: 0;
+  padding: 15px 20px;
+  color: #203a54;
+  background: #edf4f8;
+  font-size: 20px;
+}
+
+.print-report-section table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.print-report-section th,
+.print-report-section td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.print-report-section th {
+  color: #203a54;
+  background: #f5f8fa;
+  white-space: nowrap;
+}
+
+.print-report-section tbody tr:nth-child(even) {
+  background: #fbfcfd;
+}
+
+.print-report-section tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.option-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  margin-right: 8px;
+  color: #ffffff;
+  background: #3d668a;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.vote-count {
+  color: #203a54;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.empty-cell {
+  padding: 25px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.print-report-footer {
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* 手機顯示 */
+
+@media (max-width: 720px) {
+  #print-report-v2 {
+    width: calc(100% - 20px);
+    margin: 16px auto;
+  }
+
+  .print-report-header {
+    padding: 25px;
+  }
+
+  .print-report-header h1 {
+    font-size: 26px;
+  }
+
+  .print-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .print-report-section {
+    overflow-x: auto;
+  }
+
+  .print-report-section table {
+    min-width: 650px;
+  }
+}
+
+/* 實際列印 */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 13mm;
+  }
+
+  body.print-page {
+    color: #000000;
+    background: #ffffff;
+  }
+
+  #print-report-v2 {
+    width: 100%;
+    margin: 0;
+  }
+
+  .print-report-header {
+    color: #000000;
+    background: #ffffff;
+    border: 2px solid #203a54;
+    box-shadow: none;
+  }
+
+  .print-report-header::after {
+    display: none;
+  }
+
+  .print-report-header p {
+    color: var(--muted);
+  }
+
+  .print-report-section {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .print-report-section thead {
+    display: table-header-group;
+  }
+
+  .print-report-section tr {
+    break-inside: avoid;
+  }
+}
