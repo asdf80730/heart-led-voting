@@ -19,9 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
  * ========================================================= */
 
 function 綁定事件_() {
-  綁定元素事件_('retry-button', 'click', function () {
-    window.location.reload();
-  });
+  綁定元素事件_('retry-button', 'click', 重新登入_);
 
   綁定元素事件_('refresh-button', 'click', 載入投票列表_);
 
@@ -44,6 +42,38 @@ function 綁定元素事件_(id, eventName, handler) {
 
   if (element) {
     element.addEventListener(eventName, handler);
+  }
+}
+
+/**
+ * 錯誤畫面的「重新整理」按鈕：
+ * 清除目前 Token，登出 LIFF，重新登入並取得新的 ID Token。
+ */
+function 重新登入_() {
+  state.idToken = '';
+  state.session = null;
+  state.currentVote = null;
+  state.operationBusy = false;
+
+  try {
+    if (!window.liff) {
+      window.location.reload();
+      return;
+    }
+
+    if (liff.isLoggedIn()) {
+      liff.logout();
+    }
+
+    liff.login({
+      redirectUri: window.location.href
+    });
+  } catch (error) {
+    frontLog_('liff.relogin.failed', {
+      message: error.message
+    });
+
+    window.location.reload();
   }
 }
 
